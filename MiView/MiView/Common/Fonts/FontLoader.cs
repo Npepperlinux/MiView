@@ -66,7 +66,7 @@ namespace MiView.Common.Fonts
             }
 
             System.Drawing.Text.PrivateFontCollection Col = new System.Drawing.Text.PrivateFontCollection();
-            Col.AddFontFile(_Font_Prefix + _FontPair[Selector]);
+            Col.AddFontFile(_FontDirectory + _FontPair[Selector]);
 
             return new System.Drawing.Font(Col.Families[0], Size);
         }
