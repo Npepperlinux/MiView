@@ -40,8 +40,6 @@ namespace MiView
             cmbInstanceSelect = new ComboBox();
             textBox2 = new TextBox();
             label1 = new Label();
-            dataGridTimeLine1 = new DataGridTimeLine();
-            ((System.ComponentModel.ISupportInitialize)dataGridTimeLine1).BeginInit();
             tbMain.SuspendLayout();
             tpMain.SuspendLayout();
             statusStrip1.SuspendLayout();
@@ -69,7 +67,6 @@ namespace MiView
             // 
             // tpMain
             // 
-            tpMain.Controls.Add(dataGridTimeLine1);
             tpMain.Location = new Point(4, 4);
             tpMain.Name = "tpMain";
             tpMain.Padding = new Padding(3);
@@ -134,26 +131,6 @@ namespace MiView
             label1.TabIndex = 6;
             label1.Text = "label1";
             // 
-            // dataGridTimeLine1
-            // 
-            dataGridTimeLine1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            dataGridTimeLine1.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridTimeLine1.Location = new Point(3, 3);
-            dataGridTimeLine1.Name = "dataGridTimeLine1";
-            dataGridTimeLine1.Size = new Size(770, 299);
-            dataGridTimeLine1.TabIndex = 0;
-            dataGridTimeLine1.RowHeadersVisible = false;
-#if !DEBUG
-            dataGridTimeLine1.ColumnHeadersVisible = false;
-#endif
-            dataGridTimeLine1.CellBorderStyle = DataGridViewCellBorderStyle.None;
-            dataGridTimeLine1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dataGridTimeLine1.AllowUserToAddRows = false;
-            dataGridTimeLine1.AllowUserToDeleteRows = false;
-            dataGridTimeLine1.AllowUserToResizeColumns = false;
-            dataGridTimeLine1.AllowUserToResizeRows = false;
-            dataGridTimeLine1.ReadOnly = true;
-            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -174,7 +151,6 @@ namespace MiView
             tpMain.ResumeLayout(false);
             statusStrip1.ResumeLayout(false);
             statusStrip1.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)dataGridTimeLine1).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -191,6 +167,5 @@ namespace MiView
         private ComboBox cmbInstanceSelect;
         private TextBox textBox2;
         private Label label1;
-        private DataGridTimeLine dataGridTimeLine1;
     }
 }

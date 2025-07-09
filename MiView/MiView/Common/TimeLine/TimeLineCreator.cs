@@ -113,8 +113,222 @@ namespace MiView.Common.TimeLine
 
         public List<TimeLineContainer> TimeLineData = new List<TimeLineContainer>();
 
+        /// <summary>
+        /// タイムライン管理オブジェクト
+        /// </summary>
+        private Dictionary<string, DataGridTimeLine> Grids = new Dictionary<string, DataGridTimeLine>();
+
         public TimeLineCreator()
         {
+        }
+
+        /// <summary>
+        /// メインフォームへタイムラインを追加
+        /// </summary>
+        /// <param name="MainForm"></param>
+        public void CreateTimeLine(ref Form MainForm, string Definition, string? ChildDefinition = null)
+        {
+            // コントロールがあるか検索tpObj.Controls.Find("tpMain", false)
+            var tpObj = MainForm.Controls.Cast<Control>().ToList().Find(r => { return r.Name == "tbMain"; });
+            if (ChildDefinition != null)
+            {
+                var tpObjb = tpObj.Controls.Find(ChildDefinition, false);
+                if (tpObjb.Length > 0)
+                {
+                    tpObj = tpObj.Controls.Find(ChildDefinition, false)[0];
+                }
+            }
+            if (tpObj != null)
+            {
+                System.Diagnostics.Debug.WriteLine("hoge");
+                DataGridTimeLine Grid = new DataGridTimeLine();
+                ((System.ComponentModel.ISupportInitialize)Grid).BeginInit();
+
+                // 
+                // Grid
+                // 
+                Grid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+                Grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+                Grid.Location = new Point(3, 3);
+                Grid.Name = "dataGridTimeLine1";
+                Grid.Size = new Size(770, 299);
+                Grid.TabIndex = 0;
+                Grid.RowHeadersVisible = false;
+#if !DEBUG
+                            Grid.ColumnHeadersVisible = false;
+#endif
+                Grid.CellBorderStyle = DataGridViewCellBorderStyle.None;
+                Grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+                Grid.AllowUserToAddRows = false;
+                Grid.AllowUserToDeleteRows = false;
+                Grid.AllowUserToResizeColumns = false;
+                Grid.AllowUserToResizeRows = false;
+                Grid.ReadOnly = true;
+
+                ((System.ComponentModel.ISupportInitialize)Grid).EndInit();
+
+                this.AddDbg(Grid);
+
+                tpObj.Controls.Add(Grid);
+            }
+            else
+            {
+                throw new KeyNotFoundException();
+            }
+        }
+
+        private void AddDbg(DataGridTimeLine DgTimeLine)
+        {
+#if DEBUG
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
+                ISLOCAL = true,
+                DETAIL = "これはデバッグ実行時に表示されます。",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
+                ISLOCAL = true,
+                RENOTED = true,
+                DETAIL = "リノート表示。",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
+                ISLOCAL = true,
+                RENOTED = false,
+                REPLAYED = true,
+                DETAIL = "リプライ表示。",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
+                ISLOCAL = true,
+                RENOTED = false,
+                REPLAYED = true,
+                CW = true,
+                DETAIL = "CW",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
+                ISLOCAL = true,
+                RENOTED = true,
+                REPLAYED = true,
+                CW = true,
+                DETAIL = "ごった煮",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
+                ISLOCAL = true,
+                RENOTED = false,
+                DETAIL = "パブリック",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.SemiPublic,
+                ISLOCAL = true,
+                RENOTED = false,
+                DETAIL = "セミパブリック",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Home,
+                ISLOCAL = true,
+                RENOTED = false,
+                DETAIL = "ホーム",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Follower,
+                ISLOCAL = true,
+                RENOTED = false,
+                DETAIL = "フォロワー",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
+                ISLOCAL = true,
+                RENOTED = false,
+                DETAIL = "ダイレクトメッセージ",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
+                ISLOCAL = false,
+                RENOTED = false,
+                DETAIL = "abcdefghijklmnopqrstuvwxyz",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
+                ISLOCAL = false,
+                RENOTED = false,
+                DETAIL = "abcdefghijklmnopqrstuvwxyz".ToUpper(),
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+#endif
         }
     }
 
@@ -156,6 +370,9 @@ namespace MiView.Common.TimeLine
         public string ORIGINAL { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// タイムラインコントロール
+    /// </summary>
     partial class DataGridTimeLine : System.Windows.Forms.DataGridView
     {
         /// <summary>

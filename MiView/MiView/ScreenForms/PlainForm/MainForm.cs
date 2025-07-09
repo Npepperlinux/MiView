@@ -9,166 +9,30 @@ namespace MiView
 {
     public partial class MainForm : Form
     {
+        /// <summary>
+        /// タイムラインマネージャ
+        /// </summary>
+        private TimeLineCreator TimeLineManage = new TimeLineCreator();
+
+        /// <summary>
+        /// このフォーム
+        /// </summary>
+        private Form MainFormObj;
+
         public MainForm()
         {
             InitializeComponent();
 
             this.label1.Font = new FontLoader().LoadFontFromFile(FontLoader.FONT_SELECTOR.MATERIALICONS, this.label1.Font.Size);
             this.label1.Text = MaterialIcons.Keyboard;
+
+            this.MainFormObj = this;
         }
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-#if DEBUG
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
-                ISLOCAL = true,
-                DETAIL = "これはデバッグ実行時に表示されます。",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
-                ISLOCAL = true,
-                RENOTED = true,
-                DETAIL = "リノート表示。",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
-                ISLOCAL = true,
-                RENOTED = false,
-                REPLAYED = true,
-                DETAIL = "リプライ表示。",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
-                ISLOCAL = true,
-                RENOTED = false,
-                REPLAYED = true,
-                CW = true,
-                DETAIL = "CW",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
-                ISLOCAL = true,
-                RENOTED = true,
-                REPLAYED = true,
-                CW = true,
-                DETAIL = "ごった煮",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
-                ISLOCAL = true,
-                RENOTED = false,
-                DETAIL = "パブリック",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.SemiPublic,
-                ISLOCAL = true,
-                RENOTED = false,
-                DETAIL = "セミパブリック",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Home,
-                ISLOCAL = true,
-                RENOTED = false,
-                DETAIL = "ホーム",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Follower,
-                ISLOCAL = true,
-                RENOTED = false,
-                DETAIL = "フォロワー",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
-                ISLOCAL = true,
-                RENOTED = false,
-                DETAIL = "ダイレクトメッセージ",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
-                ISLOCAL = false,
-                RENOTED = false,
-                DETAIL = "abcdefghijklmnopqrstuvwxyz",
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-            this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer()
-            {
-                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Direct,
-                ISLOCAL = false,
-                RENOTED = false,
-                DETAIL = "abcdefghijklmnopqrstuvwxyz".ToUpper(),
-                USERID = "MiVIEW-SYSTEM",
-                USERNAME = "アプリ",
-                SOFTWARE = "MiView 0.0.1",
-                SOURCE = "localhost",
-                UPDATEDAT = "1960/01/01 00:00:00:000"
-            });
-#endif
+            TimeLineManage.CreateTimeLine(ref this.MainFormObj, "Main", "tpMain");
+
 
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public });
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { PROTECTED = TimeLineContainer.PROTECTED_STATUS.SemiPublic });
