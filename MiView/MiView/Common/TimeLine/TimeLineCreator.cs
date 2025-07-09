@@ -128,16 +128,8 @@ namespace MiView.Common.TimeLine
         /// <param name="MainForm"></param>
         public void CreateTimeLine(ref Form MainForm, string Definition, string? ChildDefinition = null)
         {
-            // コントロールがあるか検索tpObj.Controls.Find("tpMain", false)
-            var tpObj = MainForm.Controls.Cast<Control>().ToList().Find(r => { return r.Name == "tbMain"; });
-            if (ChildDefinition != null)
-            {
-                var tpObjb = tpObj.Controls.Find(ChildDefinition, false);
-                if (tpObjb.Length > 0)
-                {
-                    tpObj = tpObj.Controls.Find(ChildDefinition, false)[0];
-                }
-            }
+            // コントロールがあるか検索
+            var tpObj = GetControlFromMainForm(ref MainForm, ChildDefinition);
             if (tpObj != null)
             {
                 System.Diagnostics.Debug.WriteLine("hoge");
@@ -170,6 +162,7 @@ namespace MiView.Common.TimeLine
                 this.AddDbg(Grid);
 
                 tpObj.Controls.Add(Grid);
+                Grids.Add(Definition, Grid);
             }
             else
             {
@@ -177,6 +170,24 @@ namespace MiView.Common.TimeLine
             }
         }
 
+        private Control? GetControlFromMainForm(ref Form MainForm, string? ChildDefinition)
+        {
+            var tpObj = MainForm.Controls.Cast<Control>().ToList().Find(r => { return r.Name == "tbMain"; });
+            if (ChildDefinition != null)
+            {
+                var tpObjb = tpObj.Controls.Find(ChildDefinition, false);
+                if (tpObjb.Length > 0)
+                {
+                    tpObj = tpObj.Controls.Find(ChildDefinition, false)[0];
+                }
+            }
+            return tpObj;
+        }
+
+        /// <summary>
+        /// デバッグ情報付記
+        /// </summary>
+        /// <param name="DgTimeLine"></param>
         private void AddDbg(DataGridTimeLine DgTimeLine)
         {
 #if DEBUG
@@ -329,6 +340,75 @@ namespace MiView.Common.TimeLine
                 UPDATEDAT = "1960/01/01 00:00:00:000"
             });
 #endif
+        }
+
+        /// <summary>
+        /// メインフォームからタイムラインを除去
+        /// </summary>
+        /// <param name="MainForm"></param>
+        /// <param name="Definition"></param>
+        /// <param name="ChildDefinition"></param>
+        /// <exception cref="TimeLineNotFoundException"></exception>
+        /// <exception cref="KeyNotFoundException"></exception>
+        public void DeleteTimeLine(ref Form MainForm, string Definition, string? ChildDefinition = null)
+        {
+            if (!this.Grids.ContainsKey(Definition))
+            {
+                throw new TimeLineNotFoundException(null, Definition);
+            }
+            // コントロールがあるか検索
+            var tpObj = GetControlFromMainForm(ref MainForm, ChildDefinition);
+            if (tpObj != null)
+            {
+                tpObj.Controls.Remove(this.Grids[Definition]);
+                this.Grids.Remove(Definition);
+            }
+            else
+            {
+                throw new KeyNotFoundException();
+            }
+        }
+    }
+
+    internal class TimeLineNotFoundException : Exception
+    {
+        /// <summary>
+        /// 定義名
+        /// </summary>
+        private string Definition {  get; set; } = string.Empty;
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        public TimeLineNotFoundException()
+        {
+        }
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="message"></param>
+        public TimeLineNotFoundException(string? message) : base(message)
+        {
+        }
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="Definition"></param>
+        public TimeLineNotFoundException(string? message, string Definition)
+        {
+        }
+
+        public override string ToString()
+        {
+            return this.Definition != string.Empty ? this.Definition: base.ToString();
+        }
+
+        public string CallDefinition()
+        {
+            return this.Definition;
         }
     }
 

@@ -32,6 +32,7 @@ namespace MiView
         private void MainForm_Load(object sender, EventArgs e)
         {
             TimeLineManage.CreateTimeLine(ref this.MainFormObj, "Main", "tpMain");
+            // TimeLineManage.DeleteTimeLine(ref this.MainFormObj, "Main", "tpMain");
 
 
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public });
