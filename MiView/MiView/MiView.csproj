@@ -21,8 +21,11 @@
 
   <ItemGroup>
     <Folder Include="Common\AnalyzeData\" />
-    <Folder Include="Common\Connection\WebSocketManager\" />
     <Folder Include="ScreenForms\DialogForm\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>

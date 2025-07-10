@@ -1,8 +1,10 @@
+using MiView.Common.Connection.WebSocket;
 using MiView.Common.Fonts;
 using MiView.Common.Fonts.Material;
 using MiView.Common.TimeLine;
 using System.ComponentModel;
 using System.Reflection;
+using System.Security.Policy;
 using System.Text;
 
 namespace MiView
@@ -12,7 +14,7 @@ namespace MiView
         /// <summary>
         /// タイムラインマネージャ
         /// </summary>
-        private TimeLineCreator TimeLineManage = new TimeLineCreator();
+        private TimeLineCreator _TimeLineManage = new TimeLineCreator();
 
         /// <summary>
         /// このフォーム
@@ -31,7 +33,7 @@ namespace MiView
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            TimeLineManage.CreateTimeLine(ref this.MainFormObj, "Main", "tpMain");
+            _TimeLineManage.CreateTimeLine(ref this.MainFormObj, "Main", "tpMain");
             // TimeLineManage.DeleteTimeLine(ref this.MainFormObj, "Main", "tpMain");
 
 
@@ -49,6 +51,10 @@ namespace MiView
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { SOFTWARE = "misskey 2024.1.0" });
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { SOURCE = "misskey.niri.la" });
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { UPDATEDAT = "2000/01/01 01:01:01" });
+
+            var WSManager = WebSocketTimeLineHome.OpenTimeLine("misskey.io", "jl9FCAyqMAtfVPRjOgOukq4BtnZFJCTn");
+            System.Diagnostics.Debug.WriteLine(WSManager.GetSocketState());
+            WebSocketTimeLineHome.ReadTimeLineContinuous(WSManager);
         }
     }
 }
