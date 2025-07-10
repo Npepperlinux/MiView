@@ -52,9 +52,9 @@ namespace MiView
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { SOURCE = "misskey.niri.la" });
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { UPDATEDAT = "2000/01/01 01:01:01" });
 
-            var WSManager = WebSocketTimeLineHome.OpenTimeLine("misskey.io", "jl9FCAyqMAtfVPRjOgOukq4BtnZFJCTn");
-            System.Diagnostics.Debug.WriteLine(WSManager.GetSocketState());
-            WebSocketTimeLineHome.ReadTimeLineContinuous(WSManager);
+            //var WSManager = WebSocketTimeLineHome.OpenTimeLine("misskey.io", "");
+            //System.Diagnostics.Debug.WriteLine(WSManager.GetSocketState());
+            //WebSocketTimeLineHome.ReadTimeLineContinuous(WSManager);
         }
     }
 }
