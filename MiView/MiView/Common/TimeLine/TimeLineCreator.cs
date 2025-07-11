@@ -3,6 +3,7 @@ using MiView.Common.Fonts.Material;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.DirectoryServices.ActiveDirectory;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -67,6 +68,18 @@ namespace MiView.Common.TimeLine
             /// </summary>
             ISLOCAL_DISP,
             /// <summary>
+            /// チャンネル
+            /// </summary>
+            ISCHANNEL,
+            /// <summary>
+            /// チャンネル名
+            /// </summary>
+            CHANNEL_NAME,
+            /// <summary>
+            /// チャンネル表示
+            /// </summary>
+            ISCHANNEL_DISP,
+            /// <summary>
             /// CW
             /// </summary>
             CW,
@@ -108,7 +121,9 @@ namespace MiView.Common.TimeLine
             TIMELINE_ELEMENT.PROTECTED,
             TIMELINE_ELEMENT.ISLOCAL,
             TIMELINE_ELEMENT.REPLAYED,
-            TIMELINE_ELEMENT.ORIGINAL
+            TIMELINE_ELEMENT.ORIGINAL,
+            TIMELINE_ELEMENT.CHANNEL_NAME,
+            TIMELINE_ELEMENT.ISCHANNEL
         };
 
         public List<TimeLineContainer> TimeLineData = new List<TimeLineContainer>();
@@ -120,6 +135,22 @@ namespace MiView.Common.TimeLine
 
         public TimeLineCreator()
         {
+        }
+
+        /// <summary>
+        /// フォームオブジェクトの取得
+        /// </summary>
+        /// <param name="MainForm"></param>
+        /// <param name="Definition"></param>
+        /// <returns></returns>
+        /// <exception cref="KeyNotFoundException"></exception>
+        public DataGridTimeLine GetTimeLineObjectDirect(ref Form MainForm, string Definition)
+        {
+            if (!this.Grids.ContainsKey(Definition))
+            {
+                throw new KeyNotFoundException();
+            }
+            return this.Grids[Definition];
         }
 
         /// <summary>
@@ -167,6 +198,27 @@ namespace MiView.Common.TimeLine
             else
             {
                 throw new KeyNotFoundException();
+            }
+        }
+
+        public void CreateTimeLineTab(ref Form MainForm, string Name, string Text)
+        {
+            var tpObj = GetControlFromMainForm(ref MainForm, null);
+            if (tpObj != null)
+            {
+                TabPage tp = new TabPage();
+                // 
+                // tpMain
+                // 
+                tp.Location = new Point(4, 4);
+                tp.Name = Name;
+                tp.Padding = new Padding(3);
+                tp.Size = new Size(776, 305);
+                tp.TabIndex = 0;
+                tp.Text = Text;
+                tp.UseVisualStyleBackColor = true;
+
+                tpObj.Controls.Add(tp);
             }
         }
 
@@ -221,6 +273,21 @@ namespace MiView.Common.TimeLine
                 RENOTED = false,
                 REPLAYED = true,
                 DETAIL = "リプライ表示。",
+                USERID = "MiVIEW-SYSTEM",
+                USERNAME = "アプリ",
+                SOFTWARE = "MiView 0.0.1",
+                SOURCE = "localhost",
+                UPDATEDAT = "1960/01/01 00:00:00:000"
+            });
+            DgTimeLine.InsertTimeLineData(new TimeLineContainer()
+            {
+                PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
+                ISLOCAL = true,
+                RENOTED = false,
+                REPLAYED = false,
+                ISCHANNEL = true,
+                CHANNEL_NAME = "test",
+                DETAIL = "チャンネル表示。",
                 USERID = "MiVIEW-SYSTEM",
                 USERNAME = "アプリ",
                 SOFTWARE = "MiView 0.0.1",
@@ -440,6 +507,9 @@ namespace MiView.Common.TimeLine
         public string? RENOTED_DISP { get; set; }
         public bool ISLOCAL { get; set; } = false;
         public string? ISLOCAL_DISP {  get; set; }
+        public bool ISCHANNEL { get; set; } = false;
+        public string? CHANNEL_NAME { get; set; }
+        public string? ISCHANNEL_DISP { get; set; }
         public bool CW {  get; set; } = false;
         public string? CW_DISP { get; set; }
         public string DETAIL { get; set; } = string.Empty;
@@ -507,6 +577,10 @@ namespace MiView.Common.TimeLine
         /// CW表示
         /// </summary>
         private static string _Common_Visibility_Off = MaterialIcons.VisibilityOff;
+        /// <summary>
+        /// チャンネル表示
+        /// </summary>
+        private static string _Common_Channel = MaterialIcons.Tv;
 
         /// <summary>
         /// 列幅
@@ -522,6 +596,7 @@ namespace MiView.Common.TimeLine
             { TIMELINE_ELEMENT.ISLOCAL_DISP, 20 },
             { TIMELINE_ELEMENT.RENOTED_DISP, 20 },
             { TIMELINE_ELEMENT.CW_DISP, 20 },
+            { TIMELINE_ELEMENT.ISCHANNEL_DISP, 20 },
             { TIMELINE_ELEMENT.DETAIL, 350 },
             { TIMELINE_ELEMENT.SOFTWARE, 40 },
             { TIMELINE_ELEMENT.UPDATEDAT, 140 },
@@ -552,7 +627,8 @@ namespace MiView.Common.TimeLine
                     ColName == TimeLineCreator.TIMELINE_ELEMENT.PROTECTED_DISP.ToString() ||
                     ColName == TimeLineCreator.TIMELINE_ELEMENT.ISLOCAL_DISP.ToString() ||
                     ColName == TimeLineCreator.TIMELINE_ELEMENT.RENOTED_DISP.ToString() ||
-                    ColName == TimeLineCreator.TIMELINE_ELEMENT.CW_DISP.ToString())
+                    ColName == TimeLineCreator.TIMELINE_ELEMENT.CW_DISP.ToString() ||
+                    ColName == TimeLineCreator.TIMELINE_ELEMENT.ISCHANNEL_DISP.ToString())
                 {
                     Col.DefaultCellStyle.Font = DefaultMaterialFont;
                 }
@@ -585,6 +661,7 @@ namespace MiView.Common.TimeLine
             this.Rows[0].Cells[(int)TIMELINE_ELEMENT.PROTECTED_DISP].Style.Font = DefaultMaterialFont;
             this.Rows[0].Cells[(int)TIMELINE_ELEMENT.RENOTED_DISP].Style.Font = DefaultMaterialFont;
             this.Rows[0].Cells[(int)TIMELINE_ELEMENT.CW_DISP].Style.Font = DefaultMaterialFont;
+            this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISCHANNEL_DISP].Style.Font = DefaultMaterialFont;
 
             // カラム別処理
             foreach (string ColName in Enum.GetNames(typeof(TimeLineCreator.TIMELINE_ELEMENT)))
@@ -625,7 +702,9 @@ namespace MiView.Common.TimeLine
                 ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.PROTECTED &&
                 ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.ISLOCAL &&
                 ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.RENOTED &&
-                ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.CW)
+                ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.CW &&
+                ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.ISCHANNEL &&
+                ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.CHANNEL_NAME)
             {
                 return;
             }
@@ -703,6 +782,19 @@ namespace MiView.Common.TimeLine
                             = (bool)CellValue ? "リノート" : "";
                     this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.RENOTED_DISP].Style.ForeColor
                             = (bool)CellValue ? Color.Green : Color.Red;
+                    break;
+                case (int)TimeLineCreator.TIMELINE_ELEMENT.ISCHANNEL:
+                    this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.ISCHANNEL_DISP].Value
+                            = (bool)CellValue ? _Common_Channel : _Common_Empty;
+                    this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.ISCHANNEL_DISP].Style.ForeColor
+                            = (bool)CellValue ? Color.Green : Color.Red;
+                    break;
+                case (int)TimeLineCreator.TIMELINE_ELEMENT.CHANNEL_NAME:
+                    if (this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.CHANNEL_NAME].Value != null)
+                    {
+                        this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.ISCHANNEL_DISP].ToolTipText
+                                = this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.CHANNEL_NAME].Value.ToString();
+                    }
                     break;
             }
         }

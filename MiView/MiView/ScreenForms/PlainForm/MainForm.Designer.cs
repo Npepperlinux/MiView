@@ -40,8 +40,8 @@ namespace MiView
             cmbInstanceSelect = new ComboBox();
             textBox2 = new TextBox();
             label1 = new Label();
+            cmdAddInstance = new Button();
             tbMain.SuspendLayout();
-            tpMain.SuspendLayout();
             statusStrip1.SuspendLayout();
             SuspendLayout();
             // 
@@ -131,11 +131,22 @@ namespace MiView
             label1.TabIndex = 6;
             label1.Text = "label1";
             // 
+            // cmdAddInstance
+            // 
+            cmdAddInstance.Location = new Point(4, 582);
+            cmdAddInstance.Name = "cmdAddInstance";
+            cmdAddInstance.Size = new Size(106, 23);
+            cmdAddInstance.TabIndex = 7;
+            cmdAddInstance.Text = "インスタンス追加";
+            cmdAddInstance.UseVisualStyleBackColor = true;
+            cmdAddInstance.Click += cmdAddInstance_Click;
+            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(784, 631);
+            Controls.Add(cmdAddInstance);
             Controls.Add(label1);
             Controls.Add(textBox2);
             Controls.Add(cmbInstanceSelect);
@@ -148,14 +159,13 @@ namespace MiView
             Text = "MiView - MainForm";
             Load += MainForm_Load;
             tbMain.ResumeLayout(false);
-            tpMain.ResumeLayout(false);
             statusStrip1.ResumeLayout(false);
             statusStrip1.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
 
-#endregion
+        #endregion
 
         private MenuStrip menuStrip1;
         private TabControl tbMain;
@@ -167,5 +177,6 @@ namespace MiView
         private ComboBox cmbInstanceSelect;
         private TextBox textBox2;
         private Label label1;
+        private Button cmdAddInstance;
     }
 }

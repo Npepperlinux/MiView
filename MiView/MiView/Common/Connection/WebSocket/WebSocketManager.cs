@@ -1,8 +1,13 @@
-﻿using System;
+﻿using MiView.Common.AnalyzeData;
+using MiView.Common.Connection.WebSocket.Event;
+using MiView.Common.TimeLine;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace MiView.Common.Connection.WebSocket
@@ -46,6 +51,24 @@ namespace MiView.Common.Connection.WebSocket
         = false;
 
         /// <summary>
+        /// 紐づいているタイムラインオブジェクト
+        /// </summary>
+        private DataGridTimeLine[]? _TimeLineObject
+        {
+            get; set;
+        }
+        = new DataGridTimeLine[0];
+
+        public void SetDataGridTimeLine(DataGridTimeLine timeLine)
+        {
+            if (this._TimeLineObject == null)
+            {
+                this._TimeLineObject = new DataGridTimeLine[0];
+            }
+            this._TimeLineObject = this._TimeLineObject.Concat(new DataGridTimeLine[] { timeLine }).ToArray();
+        }
+
+        /// <summary>
         /// WebSocket
         /// </summary>
         private ClientWebSocket _WebSocket
@@ -61,6 +84,8 @@ namespace MiView.Common.Connection.WebSocket
         /// </summary>
         public WebSocketManager()
         {
+            this.ConnectionLost += OnConnectionLost;
+            this.DataReceived += OnDataReceived;
         }
 
         /// <summary>
@@ -69,6 +94,9 @@ namespace MiView.Common.Connection.WebSocket
         /// <param name="HostUrl"></param>
         public WebSocketManager(string HostUrl)
         {
+            this.ConnectionLost += OnConnectionLost;
+            this.DataReceived += OnDataReceived;
+
             this._HostUrl = HostUrl;
 
             Task.Run(async () =>
@@ -200,10 +228,44 @@ namespace MiView.Common.Connection.WebSocket
             return string.Format("wss://{0}/streaming?i={1}", InstanceURL, APIKey);
         }
 
-        private void OnConnectionLost()
+        public event EventHandler<ConnectDataReceivedEventArgs> ConnectionLost;
+        protected virtual void OnConnectionLost(object? sender, ConnectDataReceivedEventArgs e)
+        {
+        }
+        protected void CallConnectionLost()
         {
         }
 
+        public event EventHandler<ConnectDataReceivedEventArgs> DataReceived;
+        protected virtual void OnDataReceived(object? sender, ConnectDataReceivedEventArgs e)
+        {
+            if (this._TimeLineObject == null)
+            {
+                // objectがない場合
+                return;
+            }
+            if (e.MessageRaw == null)
+            {
+                // データ受信不可能の場合
+                return;
+            }
 
+            dynamic Res = System.Text.Json.JsonDocument.Parse(e.MessageRaw);
+            var t = JsonNode.Parse(e.MessageRaw);
+
+            // ChannelToTimeLineData.Type(t);
+
+            foreach (DataGridTimeLine DGrid in this._TimeLineObject)
+            {
+                if (DGrid.InvokeRequired)
+                {
+                    DGrid.Invoke(() => { DGrid.InsertTimeLineData(ChannelToTimeLineContainer.ConvertTimeLineContainer(t)); });
+                }
+            }
+        }
+        protected void CallDataReceived(string ResponseMessage)
+        {
+            DataReceived(this, new ConnectDataReceivedEventArgs() { MessageRaw = ResponseMessage });
+        }
     }
 }

@@ -47,6 +47,10 @@ namespace MiView.Common.Connection.WebSocket
             return WSTimeLine;
         }
 
+        /// <summary>
+        /// タイムライン取得
+        /// </summary>
+        /// <param name="WSTimeLine"></param>
         public static void ReadTimeLineContinuous(WebSocketTimeLineHome WSTimeLine)
         {
             // バッファは多めに取っておく(どうせあとでカットする)
@@ -68,6 +72,8 @@ namespace MiView.Common.Connection.WebSocket
                         {
                             var ResponseMessage = Encoding.UTF8.GetString(ResponseBuffer, 0, Response.Count);
                             DbgOutputSocketReceived(ResponseMessage);
+
+                            WSTimeLine.CallDataReceived(ResponseMessage);
                         }
                     }
                     catch(Exception ce)

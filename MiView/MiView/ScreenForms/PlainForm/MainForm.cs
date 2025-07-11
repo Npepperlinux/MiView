@@ -1,7 +1,9 @@
 using MiView.Common.Connection.WebSocket;
+using MiView.Common.Connection.WebSocket.Event;
 using MiView.Common.Fonts;
 using MiView.Common.Fonts.Material;
 using MiView.Common.TimeLine;
+using MiView.ScreenForms.DialogForm;
 using System.ComponentModel;
 using System.Reflection;
 using System.Security.Policy;
@@ -34,6 +36,14 @@ namespace MiView
         private void MainForm_Load(object sender, EventArgs e)
         {
             _TimeLineManage.CreateTimeLine(ref this.MainFormObj, "Main", "tpMain");
+
+            _TimeLineManage.CreateTimeLineTab(ref this.MainFormObj, "misskeyio", "misskey.io");
+            _TimeLineManage.CreateTimeLine(ref this.MainFormObj, "misskeyio", "misskeyio");
+
+            _TimeLineManage.CreateTimeLineTab(ref this.MainFormObj, "misskeysj", "misskey.io");
+            _TimeLineManage.CreateTimeLine(ref this.MainFormObj, "misskeysj", "misskeysj");
+
+            // _TimeLineManage.CreateTimeLine(ref this.MainFormObj, "misskey.io", "tpMain");
             // TimeLineManage.DeleteTimeLine(ref this.MainFormObj, "Main", "tpMain");
 
 
@@ -52,9 +62,35 @@ namespace MiView
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { SOURCE = "misskey.niri.la" });
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { UPDATEDAT = "2000/01/01 01:01:01" });
 
-            //var WSManager = WebSocketTimeLineHome.OpenTimeLine("misskey.io", "");
-            //System.Diagnostics.Debug.WriteLine(WSManager.GetSocketState());
-            //WebSocketTimeLineHome.ReadTimeLineContinuous(WSManager);
+        }
+
+        public void AddTimeLine(string InstanceURL, string TabName, string APIKey)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(AddTimeLine, InstanceURL, TabName, APIKey);
+                return;
+            }
+
+            // �^�u�ǉ�
+            _TimeLineManage.CreateTimeLineTab(ref this.MainFormObj, InstanceURL, TabName);
+            _TimeLineManage.CreateTimeLine(ref this.MainFormObj, InstanceURL, InstanceURL);
+
+            var WSManager = WebSocketTimeLineHome.OpenTimeLine(InstanceURL, APIKey);
+            if (WSManager.GetSocketState() != System.Net.WebSockets.WebSocketState.Open)
+            {
+                MessageBox.Show("�C���X�^���X�̓ǂݍ��݂Ɏ��s���܂����B");
+                return;
+            }
+            WSManager.SetDataGridTimeLine(_TimeLineManage.GetTimeLineObjectDirect(ref this.MainFormObj, "Main"));
+            WSManager.SetDataGridTimeLine(_TimeLineManage.GetTimeLineObjectDirect(ref this.MainFormObj, InstanceURL));
+            WebSocketTimeLineHome.ReadTimeLineContinuous(WSManager);
+        }
+
+        private void cmdAddInstance_Click(object sender, EventArgs e)
+        {
+            AddInstanceWithAPIKey AddFrm = new AddInstanceWithAPIKey(this);
+            AddFrm.ShowDialog();
         }
     }
 }
