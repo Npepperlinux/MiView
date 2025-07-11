@@ -1,8 +1,12 @@
-﻿using MiView.Common.Connection.WebSocket.Structures;
+﻿using MiView.Common.AnalyzeData;
+using MiView.Common.Connection.WebSocket.Event;
+using MiView.Common.Connection.WebSocket.Structures;
+using MiView.Common.TimeLine;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace MiView.Common.Connection.WebSocket
@@ -62,6 +66,16 @@ namespace MiView.Common.Connection.WebSocket
                     // 受信本体
                     try
                     {
+                        // 受信可能になるまで待機
+                        if (WSTimeLine.GetSocketClient().State == WebSocketState.Closed && WSTimeLine._HostUrl != null)
+                        {
+                            // 再接続
+                            await WSTimeLine.GetSocketClient().ConnectAsync(new Uri(WSTimeLine._HostUrl), CancellationToken.None);
+                        }
+                        while (WSTimeLine.GetSocketState() == WebSocketState.Closed)
+                        {
+                            // 接続スタンバイ
+                        }
                         var Response = await WSTimeLine.GetSocketClient().ReceiveAsync(new ArraySegment<byte>(ResponseBuffer), CancellationToken.None);
                         if (Response.MessageType == WebSocketMessageType.Close)
                         {
@@ -79,6 +93,7 @@ namespace MiView.Common.Connection.WebSocket
                     catch(Exception ce)
                     {
                         System.Diagnostics.Debug.WriteLine(ce);
+                        WSTimeLine.CallConnectionLost();
                     }
                 }
             });
@@ -87,6 +102,75 @@ namespace MiView.Common.Connection.WebSocket
         private static void DbgOutputSocketReceived(string Response)
         {
             System.Diagnostics.Debug.WriteLine(Response);
+        }
+
+        protected override void OnConnectionLost(object? sender, EventArgs e)
+        {
+            try
+            {
+                _ = Task.Run(async () =>
+                {
+                    await this.Close(this._HostUrl);
+                    await this.CreateAndOpen(this._HostUrl);
+                });
+            }
+            catch(Exception)
+            {
+            }
+
+            // オープンを待つ
+            while (this.GetSocketState() != WebSocketState.Open)
+            {
+                Thread.Sleep(1000);
+
+                try
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await this.Close(this._HostUrl);
+                        await this.CreateAndOpen(this._HostUrl);
+                    });
+                }
+                catch (Exception)
+                {
+                    break;
+                }
+            }
+
+            WebSocketTimeLineHome.ReadTimeLineContinuous(this);
+        }
+        protected override void OnDataReceived(object? sender, ConnectDataReceivedEventArgs e)
+        {
+            if (this._TimeLineObject == null)
+            {
+                // objectがない場合
+                return;
+            }
+            if (e.MessageRaw == null)
+            {
+                // データ受信不可能の場合
+                return;
+            }
+
+            dynamic Res = System.Text.Json.JsonDocument.Parse(e.MessageRaw);
+            var t = JsonNode.Parse(e.MessageRaw);
+
+            // ChannelToTimeLineData.Type(t);
+
+            foreach (DataGridTimeLine DGrid in this._TimeLineObject)
+            {
+                if (DGrid.InvokeRequired)
+                {
+                    try
+                    {
+                        DGrid.Invoke(() => { DGrid.InsertTimeLineData(ChannelToTimeLineContainer.ConvertTimeLineContainer(this._HostDefinition, t)); });
+                    }
+                    catch(Exception ce)
+                    {
+                        System.Diagnostics.Debug.WriteLine(ce.ToString());
+                    }
+                }
+            }
         }
     }
 }

@@ -54,7 +54,7 @@ namespace MiView.Common.AnalyzeData
 
     internal class ChannelToTimeLineContainer
     {
-        public static TimeLineContainer ConvertTimeLineContainer(JsonNode? Input)
+        public static TimeLineContainer ConvertTimeLineContainer(string OriginalHost,JsonNode? Input)
         {
             if (Input == null)
             {
@@ -63,6 +63,9 @@ namespace MiView.Common.AnalyzeData
 
             TimeLineContainer Container = new TimeLineContainer();
             string Protected = ChannelToTimeLineData.NoteVisibility(Input) != null ? JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteVisibility(Input)) : string.Empty;
+            Container.IDENTIFIED = JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteUserDetailUserName(Input)) +
+                                   JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteUserDetailName(Input)) +
+                                   JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteCreatedAt(Input));
             Container.PROTECTED = StringToProtectedStatus(Protected);
             Container.ISLOCAL = bool.Parse(JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteLocalOnly(Input)));
             Container.RENOTED = JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteRenoteId(Input)) != string.Empty;
@@ -74,6 +77,7 @@ namespace MiView.Common.AnalyzeData
             Container.USERID = JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteUserDetailUserName(Input));
             Container.USERNAME = JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteUserDetailName(Input));
             Container.UPDATEDAT = JsonConverterCommon.GetStr(ChannelToTimeLineData.NoteCreatedAt(Input));
+            Container.TLFROM = OriginalHost;
 
             return Container;
         }
@@ -88,10 +92,10 @@ namespace MiView.Common.AnalyzeData
                 case "home":
                     Status = TimeLineContainer.PROTECTED_STATUS.Home;
                     break;
-                case "follower":
+                case "followers":
                     Status = TimeLineContainer.PROTECTED_STATUS.Follower;
                     break;
-                case "direct":
+                case "specified":
                     Status = TimeLineContainer.PROTECTED_STATUS.Direct;
                     break;
                 default:

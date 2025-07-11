@@ -27,6 +27,10 @@ namespace MiView
         {
             InitializeComponent();
 
+            this.SetStyle(ControlStyles.DoubleBuffer, true);
+            this.SetStyle(ControlStyles.UserPaint, true);
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint, true);
+
             this.label1.Font = new FontLoader().LoadFontFromFile(FontLoader.FONT_SELECTOR.MATERIALICONS, this.label1.Font.Size);
             this.label1.Text = MaterialIcons.Keyboard;
 

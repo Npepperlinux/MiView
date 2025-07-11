@@ -17,7 +17,16 @@ namespace MiView.Common.Connection.WebSocket
         /// <summary>
         /// Host
         /// </summary>
-        private string _HostUrl
+        protected string _HostUrl
+        {
+            get; set;
+        }
+        = string.Empty;
+
+        /// <summary>
+        /// Host(original)
+        /// </summary>
+        protected string _HostDefinition
         {
             get; set;
         }
@@ -53,12 +62,16 @@ namespace MiView.Common.Connection.WebSocket
         /// <summary>
         /// 紐づいているタイムラインオブジェクト
         /// </summary>
-        private DataGridTimeLine[]? _TimeLineObject
+        protected DataGridTimeLine[]? _TimeLineObject
         {
             get; set;
         }
         = new DataGridTimeLine[0];
 
+        /// <summary>
+        /// Set TimeLineControl
+        /// </summary>
+        /// <param name="timeLine"></param>
         public void SetDataGridTimeLine(DataGridTimeLine timeLine)
         {
             if (this._TimeLineObject == null)
@@ -114,7 +127,7 @@ namespace MiView.Common.Connection.WebSocket
         {
             this._HostUrl = HostUrl;
 
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 await Watcher();
             });
@@ -192,12 +205,11 @@ namespace MiView.Common.Connection.WebSocket
         /// </summary>
         /// <param name="HostUrl"></param>
         /// <exception cref="InvalidOperationException"></exception>
-        private async Task CreateAndOpen(string HostUrl)
+        protected async Task CreateAndOpen(string HostUrl)
         {
             _HostUrl = HostUrl;
 
-            if ((this._State != WebSocketState.None && 
-                 this._State != WebSocketState.Closed))
+            if ((this._State == WebSocketState.Open))
             {
                 throw new InvalidOperationException("Socket is already opened");
             }
@@ -206,6 +218,10 @@ namespace MiView.Common.Connection.WebSocket
             try
             {
                 WS = new ClientWebSocket();
+                //if (this._WebSocket != null)
+                //{
+                //    WS = this._WebSocket;
+                //}
                 WS.Options.KeepAliveInterval = TimeSpan.Zero;
 
                 await WS.ConnectAsync(new Uri(this._HostUrl), CancellationToken.None);
@@ -223,45 +239,53 @@ namespace MiView.Common.Connection.WebSocket
             }
         }
 
+        protected async Task Close(string HostUrl)
+        {
+            _HostUrl = HostUrl;
+
+            if ((this._State == WebSocketState.Closed))
+            {
+                throw new InvalidOperationException("Socket is already opened");
+            }
+
+            try
+            {
+
+                await this._WebSocket.CloseAsync(WebSocketCloseStatus.InternalServerError, null, CancellationToken.None);
+
+                this._WebSocket = this._WebSocket;
+                this._State = this._WebSocket.State;
+            }
+            catch (Exception ex)
+            {
+            }
+        }
+
+        /// <summary>
+        /// Set WebSocket URL
+        /// </summary>
+        /// <param name="InstanceURL"></param>
+        /// <param name="APIKey"></param>
+        /// <returns></returns>
         protected string GetWSURL(string InstanceURL, string APIKey)
         {
+            this._HostDefinition = InstanceURL;
+
             return string.Format("wss://{0}/streaming?i={1}", InstanceURL, APIKey);
         }
 
-        public event EventHandler<ConnectDataReceivedEventArgs> ConnectionLost;
-        protected virtual void OnConnectionLost(object? sender, ConnectDataReceivedEventArgs e)
+        public event EventHandler<EventArgs> ConnectionLost;
+        protected virtual void OnConnectionLost(object? sender, EventArgs e)
         {
         }
         protected void CallConnectionLost()
         {
+            ConnectionLost(this, new EventArgs());
         }
 
         public event EventHandler<ConnectDataReceivedEventArgs> DataReceived;
         protected virtual void OnDataReceived(object? sender, ConnectDataReceivedEventArgs e)
         {
-            if (this._TimeLineObject == null)
-            {
-                // objectがない場合
-                return;
-            }
-            if (e.MessageRaw == null)
-            {
-                // データ受信不可能の場合
-                return;
-            }
-
-            dynamic Res = System.Text.Json.JsonDocument.Parse(e.MessageRaw);
-            var t = JsonNode.Parse(e.MessageRaw);
-
-            // ChannelToTimeLineData.Type(t);
-
-            foreach (DataGridTimeLine DGrid in this._TimeLineObject)
-            {
-                if (DGrid.InvokeRequired)
-                {
-                    DGrid.Invoke(() => { DGrid.InsertTimeLineData(ChannelToTimeLineContainer.ConvertTimeLineContainer(t)); });
-                }
-            }
         }
         protected void CallDataReceived(string ResponseMessage)
         {

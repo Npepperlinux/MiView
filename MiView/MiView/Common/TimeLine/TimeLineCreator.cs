@@ -107,6 +107,10 @@ namespace MiView.Common.TimeLine
             /// 投稿元オリジナルjson情報
             /// </summary>
             ORIGINAL,
+            /// <summary>
+            /// 読み取り元
+            /// </summary>
+            TLFROM,
         }
 
         /// <summary>
@@ -123,7 +127,8 @@ namespace MiView.Common.TimeLine
             TIMELINE_ELEMENT.REPLAYED,
             TIMELINE_ELEMENT.ORIGINAL,
             TIMELINE_ELEMENT.CHANNEL_NAME,
-            TIMELINE_ELEMENT.ISCHANNEL
+            TIMELINE_ELEMENT.ISCHANNEL,
+            // TIMELINE_ELEMENT.TLFROM,
         };
 
         public List<TimeLineContainer> TimeLineData = new List<TimeLineContainer>();
@@ -518,6 +523,7 @@ namespace MiView.Common.TimeLine
         public string SOURCE { get; set; } = string.Empty;
         public string SOFTWARE { get; set; } = string.Empty;
         public string ORIGINAL { get; set; } = string.Empty;
+        public string TLFROM { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -647,43 +653,59 @@ namespace MiView.Common.TimeLine
         /// <param name="Container"></param>
         public void InsertTimeLineData(TimeLineContainer Container)
         {
-            // 行挿入
-            this.Rows.Insert(0);
-
-            // 基本行高さ
-            this.Rows[0].Height = 20;
-
-            // フォントは行ごとに定義する
-            // defaultだと反映されない
-            var DefaultMaterialFont = new FontLoader().LoadFontFromFile(FontLoader.FONT_SELECTOR.MATERIALICONS, 12);
-            this.Rows[0].Cells[(int)TIMELINE_ELEMENT.REPLAYED_DISP].Style.Font = DefaultMaterialFont;
-            this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISLOCAL_DISP].Style.Font = DefaultMaterialFont;
-            this.Rows[0].Cells[(int)TIMELINE_ELEMENT.PROTECTED_DISP].Style.Font = DefaultMaterialFont;
-            this.Rows[0].Cells[(int)TIMELINE_ELEMENT.RENOTED_DISP].Style.Font = DefaultMaterialFont;
-            this.Rows[0].Cells[(int)TIMELINE_ELEMENT.CW_DISP].Style.Font = DefaultMaterialFont;
-            this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISCHANNEL_DISP].Style.Font = DefaultMaterialFont;
-
-            // カラム別処理
-            foreach (string ColName in Enum.GetNames(typeof(TimeLineCreator.TIMELINE_ELEMENT)))
+            object lk = new object();
+            lock (this)
             {
-                var Prop = typeof(TimeLineContainer).GetProperty(ColName);
-                if (Prop == null)
+                this.SuspendLayout();
+                // TL統合
+                var Intg = this.Rows.Cast<DataGridViewRow>().Where(r => r.Cells[(int)TIMELINE_ELEMENT.IDENTIFIED].Value.Equals(Container.IDENTIFIED)).ToArray();
+                if (Intg.Count() > 0)
                 {
-                    continue;
-                }
-                var PropVal = Prop.GetValue(Container);
-
-                if (PropVal != null)
-                {
-                    this.Rows[0].Cells[ColName].Value = PropVal;
+                    (Intg[0]).Cells[(int)TIMELINE_ELEMENT.TLFROM].Value = (Intg[0]).Cells[(int)TIMELINE_ELEMENT.TLFROM].Value.ToString() + Container.TLFROM;
+                    this.ResumeLayout();
+                    return;
                 }
 
-                this.ArrangeTimeLine(0, (int)Enum.Parse(typeof(TimeLineCreator.TIMELINE_ELEMENT), ColName));
 
-                var Row = this.Rows[0];
+                // 行挿入
+                this.Rows.Insert(0);
 
-                // 色変更
-                this.ChangeDispColor(ref Row, Container);
+                // 基本行高さ
+                this.Rows[0].Height = 20;
+
+                // フォントは行ごとに定義する
+                // defaultだと反映されない
+                var DefaultMaterialFont = new FontLoader().LoadFontFromFile(FontLoader.FONT_SELECTOR.MATERIALICONS, 12);
+                this.Rows[0].Cells[(int)TIMELINE_ELEMENT.REPLAYED_DISP].Style.Font = DefaultMaterialFont;
+                this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISLOCAL_DISP].Style.Font = DefaultMaterialFont;
+                this.Rows[0].Cells[(int)TIMELINE_ELEMENT.PROTECTED_DISP].Style.Font = DefaultMaterialFont;
+                this.Rows[0].Cells[(int)TIMELINE_ELEMENT.RENOTED_DISP].Style.Font = DefaultMaterialFont;
+                this.Rows[0].Cells[(int)TIMELINE_ELEMENT.CW_DISP].Style.Font = DefaultMaterialFont;
+                this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISCHANNEL_DISP].Style.Font = DefaultMaterialFont;
+
+                // カラム別処理
+                foreach (string ColName in Enum.GetNames(typeof(TimeLineCreator.TIMELINE_ELEMENT)))
+                {
+                    var Prop = typeof(TimeLineContainer).GetProperty(ColName);
+                    if (Prop == null)
+                    {
+                        continue;
+                    }
+                    var PropVal = Prop.GetValue(Container);
+
+                    if (PropVal != null)
+                    {
+                        this.Rows[0].Cells[ColName].Value = PropVal;
+                    }
+
+                    this.ArrangeTimeLine(0, (int)Enum.Parse(typeof(TimeLineCreator.TIMELINE_ELEMENT), ColName));
+
+                    var Row = this.Rows[0];
+
+                    // 色変更
+                    this.ChangeDispColor(ref Row, Container);
+                }
+                this.ResumeLayout();
             }
         }
 
