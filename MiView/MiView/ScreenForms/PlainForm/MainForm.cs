@@ -61,7 +61,6 @@ namespace MiView
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { SOFTWARE = "misskey 2024.1.0" });
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { SOURCE = "misskey.niri.la" });
             //this.dataGridTimeLine1.InsertTimeLineData(new TimeLineContainer() { UPDATEDAT = "2000/01/01 01:01:01" });
-
         }
 
         public void AddTimeLine(string InstanceURL, string TabName, string APIKey)
@@ -72,14 +71,14 @@ namespace MiView
                 return;
             }
 
-            // ï¿½^ï¿½uï¿½Ç‰ï¿½
+            // ƒ^ƒu’Ç‰Á
             _TimeLineManage.CreateTimeLineTab(ref this.MainFormObj, InstanceURL, TabName);
             _TimeLineManage.CreateTimeLine(ref this.MainFormObj, InstanceURL, InstanceURL);
 
             var WSManager = WebSocketTimeLineHome.OpenTimeLine(InstanceURL, APIKey);
             if (WSManager.GetSocketState() != System.Net.WebSockets.WebSocketState.Open)
             {
-                MessageBox.Show("ï¿½Cï¿½ï¿½ï¿½Xï¿½^ï¿½ï¿½ï¿½Xï¿½Ì“Ç‚İï¿½ï¿½İ‚Éï¿½ï¿½sï¿½ï¿½ï¿½Ü‚ï¿½ï¿½ï¿½ï¿½B");
+                MessageBox.Show("ƒCƒ“ƒXƒ^ƒ“ƒX‚Ì“Ç‚İ‚İ‚É¸”s‚µ‚Ü‚µ‚½B");
                 return;
             }
             WSManager.SetDataGridTimeLine(_TimeLineManage.GetTimeLineObjectDirect(ref this.MainFormObj, "Main"));
