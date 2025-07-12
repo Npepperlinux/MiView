@@ -38,8 +38,6 @@ namespace MiView
             tsLabelNoteCount = new ToolStripStatusLabel();
             textBox1 = new TextBox();
             cmbInstanceSelect = new ComboBox();
-            textBox2 = new TextBox();
-            label1 = new Label();
             cmdAddInstance = new Button();
             tbMain.SuspendLayout();
             statusStrip1.SuspendLayout();
@@ -99,7 +97,7 @@ namespace MiView
             // 
             // textBox1
             // 
-            textBox1.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            textBox1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             textBox1.Location = new Point(0, 518);
             textBox1.Multiline = true;
             textBox1.Name = "textBox1";
@@ -115,24 +113,9 @@ namespace MiView
             cmbInstanceSelect.Size = new Size(314, 23);
             cmbInstanceSelect.TabIndex = 4;
             // 
-            // textBox2
-            // 
-            textBox2.Location = new Point(88, 366);
-            textBox2.Name = "textBox2";
-            textBox2.Size = new Size(100, 23);
-            textBox2.TabIndex = 5;
-            // 
-            // label1
-            // 
-            label1.AutoSize = true;
-            label1.Location = new Point(392, 412);
-            label1.Name = "label1";
-            label1.Size = new Size(38, 15);
-            label1.TabIndex = 6;
-            label1.Text = "label1";
-            // 
             // cmdAddInstance
             // 
+            cmdAddInstance.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             cmdAddInstance.Location = new Point(4, 582);
             cmdAddInstance.Name = "cmdAddInstance";
             cmdAddInstance.Size = new Size(106, 23);
@@ -147,8 +130,6 @@ namespace MiView
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(784, 631);
             Controls.Add(cmdAddInstance);
-            Controls.Add(label1);
-            Controls.Add(textBox2);
             Controls.Add(cmbInstanceSelect);
             Controls.Add(textBox1);
             Controls.Add(statusStrip1);
@@ -175,8 +156,6 @@ namespace MiView
         private ToolStripStatusLabel tsLabelNoteCount;
         private TextBox textBox1;
         private ComboBox cmbInstanceSelect;
-        private TextBox textBox2;
-        private Label label1;
         private Button cmdAddInstance;
     }
 }

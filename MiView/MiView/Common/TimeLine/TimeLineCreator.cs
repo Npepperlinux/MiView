@@ -656,7 +656,6 @@ namespace MiView.Common.TimeLine
             object lk = new object();
             lock (this)
             {
-                this.SuspendLayout();
                 // TL統合
                 var Intg = this.Rows.Cast<DataGridViewRow>().Where(r => r.Cells[(int)TIMELINE_ELEMENT.IDENTIFIED].Value.Equals(Container.IDENTIFIED)).ToArray();
                 if (Intg.Count() > 0)
@@ -705,7 +704,6 @@ namespace MiView.Common.TimeLine
                     // 色変更
                     this.ChangeDispColor(ref Row, Container);
                 }
-                this.ResumeLayout();
             }
         }
 

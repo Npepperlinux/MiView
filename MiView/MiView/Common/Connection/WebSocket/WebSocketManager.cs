@@ -252,6 +252,10 @@ namespace MiView.Common.Connection.WebSocket
             {
 
                 await this._WebSocket.CloseAsync(WebSocketCloseStatus.InternalServerError, null, CancellationToken.None);
+                while (this._WebSocket.State != WebSocketState.Closed &&
+                       this._WebSocket.State != WebSocketState.Aborted)
+                {
+                }
 
                 this._WebSocket = this._WebSocket;
                 this._State = this._WebSocket.State;

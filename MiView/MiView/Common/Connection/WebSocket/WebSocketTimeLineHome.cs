@@ -67,6 +67,10 @@ namespace MiView.Common.Connection.WebSocket
                     try
                     {
                         // 受信可能になるまで待機
+                        if (WSTimeLine.GetSocketClient().State != WebSocketState.Open)
+                        {
+                            System.Diagnostics.Debug.WriteLine(WSTimeLine.GetSocketClient().State);
+                        }
                         if (WSTimeLine.GetSocketClient().State == WebSocketState.Closed && WSTimeLine._HostUrl != null)
                         {
                             // 再接続
