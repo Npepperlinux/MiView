@@ -101,7 +101,7 @@ namespace MiView.Common.AnalyzeData
             {
                 if (Container.CW)
                 {
-                    Container.DETAIL = NoteText + _RenoteSign + ReNoteSourceUser + "/" + ReNoteSourceUserName + " " + ReNoteCW;
+                    Container.DETAIL = CW + _RenoteSign + ReNoteSourceUser + "/" + ReNoteSourceUserName + " " + ReNoteCW;
                 }
                 else
                 {

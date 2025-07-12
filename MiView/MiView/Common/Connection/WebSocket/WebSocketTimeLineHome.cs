@@ -51,6 +51,44 @@ namespace MiView.Common.Connection.WebSocket
             return WSTimeLine;
         }
 
+        public WebSocketTimeLineHome OpenTimeLineDynamic(string InstanceURL, string ApiKey)
+        {
+            // WS取得
+            WebSocketTimeLineHome WSTimeLine = new WebSocketTimeLineHome();
+
+            // タイムライン用WebSocket Open
+            this.Start(WSTimeLine.GetWSURL(InstanceURL, ApiKey));
+            if (this.GetSocketClient() == null)
+            {
+                throw new InvalidOperationException("connection is not opened.");
+            }
+            while (this.IsStandBySocketOpen())
+            {
+            }
+
+            // チャンネル接続用
+            ConnectMain SendObj = new ConnectMain();
+            ConnectMainBody SendBody = new ConnectMainBody() { channel = "homeTimeline", id = "hoge" };
+            SendObj.type = "connect";
+            SendObj.body = SendBody;
+
+            var SendBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(SendObj));
+            var Buffers = new ArraySegment<byte>(SendBytes);
+
+            // ソケットのステータスを一旦リセットする(同じソケット使うので)
+            this.SetSocketState(WebSocketState.None);
+            Task.Run(async () =>
+            {
+                // 本チャンのwebsocket接続
+                await this.GetSocketClient().SendAsync(Buffers, WebSocketMessageType.Text, true, CancellationToken.None);
+            });
+            while (this.IsStandBySocketOpen())
+            {
+            }
+
+            return this;
+        }
+
         /// <summary>
         /// タイムライン取得
         /// </summary>
@@ -96,7 +134,17 @@ namespace MiView.Common.Connection.WebSocket
                     }
                     catch(Exception ce)
                     {
+                        System.Diagnostics.Debug.WriteLine("receive failed");
+                        System.Diagnostics.Debug.WriteLine(WSTimeLine._HostUrl);
                         System.Diagnostics.Debug.WriteLine(ce);
+
+                        if (WSTimeLine.GetSocketClient().State != WebSocketState.Open)
+                        {
+                            Thread.Sleep(1000);
+
+                            WebSocketTimeLineHome.ReadTimeLineContinuous(WSTimeLine);
+                        }
+
                         WSTimeLine.CallConnectionLost();
                     }
                 }
@@ -110,38 +158,38 @@ namespace MiView.Common.Connection.WebSocket
 
         protected override void OnConnectionLost(object? sender, EventArgs e)
         {
+            if (sender == null)
+            {
+                return;
+            }
+            if (sender.GetType() != typeof(WebSocketTimeLineHome))
+            {
+                return;
+            }
+            // オープンを待つ
+            WebSocketTimeLineHome WS = (WebSocketTimeLineHome)sender;
+            System.Diagnostics.Debug.WriteLine("現在の状態：" + ((WebSocketTimeLineHome)sender).GetSocketClient().State);
             try
             {
-                _ = Task.Run(async () =>
-                {
-                    await this.Close(this._HostUrl);
-                    await this.CreateAndOpen(this._HostUrl);
-                });
+                WS.OpenTimeLineDynamic(this._HostDefinition, this._APIKey);
             }
             catch(Exception)
             {
             }
-
-            // オープンを待つ
-            while (this.GetSocketState() != WebSocketState.Open)
+            if (WS == null)
             {
-                Thread.Sleep(1000);
-
-                try
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        await this.Close(this._HostUrl);
-                        await this.CreateAndOpen(this._HostUrl);
-                    });
-                }
-                catch (Exception)
-                {
-                    break;
-                }
+                // 必ず入ってるはず
+                return;
             }
 
-            WebSocketTimeLineHome.ReadTimeLineContinuous(this);
+            // オープンを待つ
+            while (WS.GetSocketState() != WebSocketState.Open)
+            {
+                Thread.Sleep(1000);
+                System.Diagnostics.Debug.WriteLine("待機中（　＾ω＾）");
+            }
+
+            WebSocketTimeLineHome.ReadTimeLineContinuous(WS);
         }
         protected override void OnDataReceived(object? sender, ConnectDataReceivedEventArgs e)
         {

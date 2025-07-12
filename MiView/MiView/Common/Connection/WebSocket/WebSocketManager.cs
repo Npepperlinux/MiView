@@ -33,6 +33,15 @@ namespace MiView.Common.Connection.WebSocket
         = string.Empty;
 
         /// <summary>
+        /// APIKey
+        /// </summary>
+        protected string _APIKey
+        {
+            get; set;
+        }
+        = string.Empty;
+
+        /// <summary>
         /// Status
         /// </summary>
         private WebSocketState _State
@@ -58,6 +67,12 @@ namespace MiView.Common.Connection.WebSocket
             get; set;
         }
         = false;
+
+        protected MainForm _MainForm
+        {
+            get; set;
+        }
+        = new MainForm();
 
         /// <summary>
         /// 紐づいているタイムラインオブジェクト
@@ -274,6 +289,7 @@ namespace MiView.Common.Connection.WebSocket
         protected string GetWSURL(string InstanceURL, string APIKey)
         {
             this._HostDefinition = InstanceURL;
+            this._APIKey = APIKey;
 
             return string.Format("wss://{0}/streaming?i={1}", InstanceURL, APIKey);
         }
