@@ -38,7 +38,7 @@
 ☆下記サーバでの動作を確認済みです
  
 - サーバードメイン.名 (この中はFork名またはバージョンです)
-- misskey.io (misskey.io-10)
+- misskey.io (2024.5.0-io.10)
 - misskey.niri.la (2025.4.1-kinel.2)
 - buicha.social (2025.4.1-buiso.2)
 - misskey.shinanoji.xyz (vanilla)
