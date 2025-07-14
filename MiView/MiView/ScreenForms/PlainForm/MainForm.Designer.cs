@@ -48,6 +48,7 @@ namespace MiView
             tabControl1 = new TabControl();
             tpNotification = new TabPage();
             tpDebug = new TabPage();
+            lblTLFrom = new Label();
             tbMain.SuspendLayout();
             statusStrip1.SuspendLayout();
             pnMain.SuspendLayout();
@@ -141,12 +142,13 @@ namespace MiView
             // 
             pnMain.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             pnMain.Controls.Add(txtDetail);
+            pnMain.Controls.Add(lblTLFrom);
             pnMain.Controls.Add(lblSoftware);
             pnMain.Controls.Add(lblUpdatedAt);
             pnMain.Controls.Add(lblUser);
             pnMain.Location = new Point(0, 275);
             pnMain.Name = "pnMain";
-            pnMain.Size = new Size(784, 146);
+            pnMain.Size = new Size(784, 171);
             pnMain.TabIndex = 8;
             // 
             // txtDetail
@@ -164,7 +166,7 @@ namespace MiView
             // 
             lblSoftware.AutoSize = true;
             lblSoftware.Font = new Font("Yu Gothic UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 128);
-            lblSoftware.Location = new Point(113, 126);
+            lblSoftware.Location = new Point(646, 126);
             lblSoftware.Name = "lblSoftware";
             lblSoftware.Size = new Size(129, 17);
             lblSoftware.TabIndex = 0;
@@ -196,9 +198,9 @@ namespace MiView
             // 
             pnSub.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             pnSub.Controls.Add(tabControl1);
-            pnSub.Location = new Point(0, 421);
+            pnSub.Location = new Point(0, 446);
             pnSub.Name = "pnSub";
-            pnSub.Size = new Size(784, 133);
+            pnSub.Size = new Size(784, 108);
             pnSub.TabIndex = 9;
             // 
             // tabControl1
@@ -206,10 +208,10 @@ namespace MiView
             tabControl1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             tabControl1.Controls.Add(tpNotification);
             tabControl1.Controls.Add(tpDebug);
-            tabControl1.Location = new Point(1, 0);
+            tabControl1.Location = new Point(1, 6);
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
-            tabControl1.Size = new Size(780, 133);
+            tabControl1.Size = new Size(780, 102);
             tabControl1.TabIndex = 0;
             // 
             // tpNotification
@@ -217,7 +219,7 @@ namespace MiView
             tpNotification.Location = new Point(4, 24);
             tpNotification.Name = "tpNotification";
             tpNotification.Padding = new Padding(3);
-            tpNotification.Size = new Size(772, 105);
+            tpNotification.Size = new Size(772, 74);
             tpNotification.TabIndex = 0;
             tpNotification.Text = "通知";
             tpNotification.UseVisualStyleBackColor = true;
@@ -227,10 +229,20 @@ namespace MiView
             tpDebug.Location = new Point(4, 24);
             tpDebug.Name = "tpDebug";
             tpDebug.Padding = new Padding(3);
-            tpDebug.Size = new Size(772, 105);
+            tpDebug.Size = new Size(772, 74);
             tpDebug.TabIndex = 1;
             tpDebug.Text = "デバッグ";
             tpDebug.UseVisualStyleBackColor = true;
+            // 
+            // lblTLFrom
+            // 
+            lblTLFrom.AutoSize = true;
+            lblTLFrom.Font = new Font("Yu Gothic UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 128);
+            lblTLFrom.Location = new Point(113, 126);
+            lblTLFrom.Name = "lblTLFrom";
+            lblTLFrom.Size = new Size(129, 17);
+            lblTLFrom.TabIndex = 0;
+            lblTLFrom.Text = "misskey.io/misskey.io";
             // 
             // MainForm
             // 
@@ -280,5 +292,6 @@ namespace MiView
         private TabControl tabControl1;
         private TabPage tpNotification;
         private TabPage tpDebug;
+        private Label lblTLFrom;
     }
 }

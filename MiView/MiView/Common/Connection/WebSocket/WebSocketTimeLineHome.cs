@@ -24,8 +24,19 @@ namespace MiView.Common.Connection.WebSocket
             {
                 throw new InvalidOperationException("connection is not opened.");
             }
+
+            int RetryCnt = 0;
             while (WSTimeLine.IsStandBySocketOpen())
             {
+                Thread.Sleep(1000);
+                RetryCnt++;
+                if (RetryCnt > 10)
+                {
+                    if (WSTimeLine.GetSocketState() != WebSocketState.Open)
+                    {
+                        WSTimeLine.OnConnectionLost(WSTimeLine, new EventArgs());
+                    }
+                }
             }
 
             // チャンネル接続用
@@ -62,8 +73,18 @@ namespace MiView.Common.Connection.WebSocket
             {
                 throw new InvalidOperationException("connection is not opened.");
             }
-            while (this.IsStandBySocketOpen())
+            int RetryCnt = 0;
+            while (WSTimeLine.IsStandBySocketOpen())
             {
+                Thread.Sleep(1000);
+                RetryCnt++;
+                if (RetryCnt > 10)
+                {
+                    if (WSTimeLine.GetSocketState() != WebSocketState.Open)
+                    {
+                        WSTimeLine.OnConnectionLost(WSTimeLine, new EventArgs());
+                    }
+                }
             }
 
             // チャンネル接続用
@@ -99,6 +120,10 @@ namespace MiView.Common.Connection.WebSocket
             var ResponseBuffer = new byte[4096 * 4];
             _ = Task.Run(async () =>
             {
+                //if (WSTimeLine.GetSocketState() != WebSocketState.Open)
+                //{
+                //    WSTimeLine.OnConnectionLost(WSTimeLine, new EventArgs());
+                //}
                 while (WSTimeLine.GetSocketState() == WebSocketState.Open)
                 {
                     // 受信本体
@@ -168,25 +193,24 @@ namespace MiView.Common.Connection.WebSocket
             }
             // オープンを待つ
             WebSocketTimeLineHome WS = (WebSocketTimeLineHome)sender;
-            System.Diagnostics.Debug.WriteLine("現在の状態：" + ((WebSocketTimeLineHome)sender).GetSocketClient().State);
-            try
+            while (WS.GetSocketState() != WebSocketState.Open)
             {
-                WS.OpenTimeLineDynamic(this._HostDefinition, this._APIKey);
-            }
-            catch(Exception)
-            {
+                // 1分おき
+                Thread.Sleep(1000 * 60 * 1);
+                System.Diagnostics.Debug.WriteLine("待機中（　＾ω＾）");
+                try
+                {
+                    WS.OpenTimeLineDynamic(this._HostDefinition, this._APIKey);
+                }
+                catch (Exception)
+                {
+                }
+                System.Diagnostics.Debug.WriteLine("現在の状態：" + ((WebSocketTimeLineHome)sender).GetSocketClient().State);
             }
             if (WS == null)
             {
                 // 必ず入ってるはず
                 return;
-            }
-
-            // オープンを待つ
-            while (WS.GetSocketState() != WebSocketState.Open)
-            {
-                Thread.Sleep(1000);
-                System.Diagnostics.Debug.WriteLine("待機中（　＾ω＾）");
             }
 
             WebSocketTimeLineHome.ReadTimeLineContinuous(WS);

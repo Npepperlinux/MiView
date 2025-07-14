@@ -204,13 +204,20 @@ namespace MiView.Common.Connection.WebSocket
                 _WebSocket = new ClientWebSocket();
             }
 
+            int TryCnt = 0;
             while (!this._ConnectionClose)
             {
+                TryCnt++;
+
                 Thread.Sleep(1000);
 
                 if (_WebSocket.State != WebSocketState.Open)
                 {
                     await CreateAndOpen(this._HostUrl);
+                }
+                if (TryCnt > 10)
+                {
+                    return;
                 }
             }
         }
@@ -243,7 +250,7 @@ namespace MiView.Common.Connection.WebSocket
 
                 if (WS.State != WebSocketState.Open)
                 {
-                    throw new InvalidOperationException("connection is not opened.");
+                    // throw new InvalidOperationException("connection is not opened.");
                 }
 
                 this._WebSocket = WS;
