@@ -36,13 +36,14 @@
 ## 動作基準Misskeyサーバ
 
 ☆下記サーバでの動作を確認済みです
-
-- misskey.io
-- misskey.niri.la
-- buicha.social
-- misskey.shinanoji.xyz
-- mi.ruruke.moe
-- misskey.flowers
+ 
+- サーバードメイン.名 (この中はFork名またはバージョンです)
+- misskey.io (misskey.io-10)
+- misskey.niri.la (2025.4.1-kinel.2)
+- buicha.social (2025.4.1-buiso.2)
+- misskey.shinanoji.xyz (vanilla)
+- mi.ruruke.moe (misskey-tempura)
+- misskey.flowers (2025.6.4-hanami.27877+5a90a40ca0)
 
 ## 元ネタとの違い
 
