@@ -39,8 +39,20 @@ namespace MiView
             textBox1 = new TextBox();
             cmbInstanceSelect = new ComboBox();
             cmdAddInstance = new Button();
+            pnMain = new Panel();
+            txtDetail = new TextBox();
+            lblSoftware = new Label();
+            lblUpdatedAt = new Label();
+            lblUser = new Label();
+            pnSub = new Panel();
+            tabControl1 = new TabControl();
+            tpNotification = new TabPage();
+            tpDebug = new TabPage();
             tbMain.SuspendLayout();
             statusStrip1.SuspendLayout();
+            pnMain.SuspendLayout();
+            pnSub.SuspendLayout();
+            tabControl1.SuspendLayout();
             SuspendLayout();
             // 
             // menuStrip1
@@ -60,15 +72,16 @@ namespace MiView
             tbMain.Multiline = true;
             tbMain.Name = "tbMain";
             tbMain.SelectedIndex = 0;
-            tbMain.Size = new Size(784, 333);
+            tbMain.Size = new Size(784, 242);
             tbMain.TabIndex = 1;
+            tbMain.SelectedIndexChanged += tbMain_SelectedIndexChanged;
             // 
             // tpMain
             // 
             tpMain.Location = new Point(4, 4);
             tpMain.Name = "tpMain";
             tpMain.Padding = new Padding(3);
-            tpMain.Size = new Size(776, 305);
+            tpMain.Size = new Size(776, 214);
             tpMain.TabIndex = 0;
             tpMain.Text = "統合TL";
             tpMain.UseVisualStyleBackColor = true;
@@ -76,7 +89,7 @@ namespace MiView
             // statusStrip1
             // 
             statusStrip1.Items.AddRange(new ToolStripItem[] { tsLabelMain, tsLabelNoteCount });
-            statusStrip1.Location = new Point(0, 609);
+            statusStrip1.Location = new Point(0, 651);
             statusStrip1.Name = "statusStrip1";
             statusStrip1.Size = new Size(784, 22);
             statusStrip1.TabIndex = 2;
@@ -98,7 +111,7 @@ namespace MiView
             // textBox1
             // 
             textBox1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            textBox1.Location = new Point(0, 518);
+            textBox1.Location = new Point(0, 560);
             textBox1.Multiline = true;
             textBox1.Name = "textBox1";
             textBox1.Size = new Size(784, 59);
@@ -108,7 +121,7 @@ namespace MiView
             // 
             cmbInstanceSelect.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             cmbInstanceSelect.FormattingEnabled = true;
-            cmbInstanceSelect.Location = new Point(466, 583);
+            cmbInstanceSelect.Location = new Point(466, 625);
             cmbInstanceSelect.Name = "cmbInstanceSelect";
             cmbInstanceSelect.Size = new Size(314, 23);
             cmbInstanceSelect.TabIndex = 4;
@@ -116,7 +129,7 @@ namespace MiView
             // cmdAddInstance
             // 
             cmdAddInstance.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-            cmdAddInstance.Location = new Point(4, 582);
+            cmdAddInstance.Location = new Point(4, 624);
             cmdAddInstance.Name = "cmdAddInstance";
             cmdAddInstance.Size = new Size(106, 23);
             cmdAddInstance.TabIndex = 7;
@@ -124,11 +137,108 @@ namespace MiView
             cmdAddInstance.UseVisualStyleBackColor = true;
             cmdAddInstance.Click += cmdAddInstance_Click;
             // 
+            // pnMain
+            // 
+            pnMain.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            pnMain.Controls.Add(txtDetail);
+            pnMain.Controls.Add(lblSoftware);
+            pnMain.Controls.Add(lblUpdatedAt);
+            pnMain.Controls.Add(lblUser);
+            pnMain.Location = new Point(0, 275);
+            pnMain.Name = "pnMain";
+            pnMain.Size = new Size(784, 146);
+            pnMain.TabIndex = 8;
+            // 
+            // txtDetail
+            // 
+            txtDetail.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtDetail.Location = new Point(113, 28);
+            txtDetail.Multiline = true;
+            txtDetail.Name = "txtDetail";
+            txtDetail.ReadOnly = true;
+            txtDetail.ScrollBars = ScrollBars.Vertical;
+            txtDetail.Size = new Size(667, 95);
+            txtDetail.TabIndex = 1;
+            // 
+            // lblSoftware
+            // 
+            lblSoftware.AutoSize = true;
+            lblSoftware.Font = new Font("Yu Gothic UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 128);
+            lblSoftware.Location = new Point(113, 126);
+            lblSoftware.Name = "lblSoftware";
+            lblSoftware.Size = new Size(129, 17);
+            lblSoftware.TabIndex = 0;
+            lblSoftware.Text = "misskey.io/misskey.io";
+            // 
+            // lblUpdatedAt
+            // 
+            lblUpdatedAt.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblUpdatedAt.AutoSize = true;
+            lblUpdatedAt.Font = new Font("Yu Gothic UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 128);
+            lblUpdatedAt.Location = new Point(646, 8);
+            lblUpdatedAt.Name = "lblUpdatedAt";
+            lblUpdatedAt.Size = new Size(126, 17);
+            lblUpdatedAt.TabIndex = 0;
+            lblUpdatedAt.Text = "1900/11/11 00:00:00";
+            lblUpdatedAt.TextAlign = ContentAlignment.MiddleRight;
+            // 
+            // lblUser
+            // 
+            lblUser.AutoSize = true;
+            lblUser.Font = new Font("Yu Gothic UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 128);
+            lblUser.Location = new Point(113, 6);
+            lblUser.Name = "lblUser";
+            lblUser.Size = new Size(48, 20);
+            lblUser.TabIndex = 0;
+            lblUser.Text = "label1";
+            // 
+            // pnSub
+            // 
+            pnSub.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            pnSub.Controls.Add(tabControl1);
+            pnSub.Location = new Point(0, 421);
+            pnSub.Name = "pnSub";
+            pnSub.Size = new Size(784, 133);
+            pnSub.TabIndex = 9;
+            // 
+            // tabControl1
+            // 
+            tabControl1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            tabControl1.Controls.Add(tpNotification);
+            tabControl1.Controls.Add(tpDebug);
+            tabControl1.Location = new Point(1, 0);
+            tabControl1.Name = "tabControl1";
+            tabControl1.SelectedIndex = 0;
+            tabControl1.Size = new Size(780, 133);
+            tabControl1.TabIndex = 0;
+            // 
+            // tpNotification
+            // 
+            tpNotification.Location = new Point(4, 24);
+            tpNotification.Name = "tpNotification";
+            tpNotification.Padding = new Padding(3);
+            tpNotification.Size = new Size(772, 105);
+            tpNotification.TabIndex = 0;
+            tpNotification.Text = "通知";
+            tpNotification.UseVisualStyleBackColor = true;
+            // 
+            // tpDebug
+            // 
+            tpDebug.Location = new Point(4, 24);
+            tpDebug.Name = "tpDebug";
+            tpDebug.Padding = new Padding(3);
+            tpDebug.Size = new Size(772, 105);
+            tpDebug.TabIndex = 1;
+            tpDebug.Text = "デバッグ";
+            tpDebug.UseVisualStyleBackColor = true;
+            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(784, 631);
+            ClientSize = new Size(784, 673);
+            Controls.Add(pnSub);
+            Controls.Add(pnMain);
             Controls.Add(cmdAddInstance);
             Controls.Add(cmbInstanceSelect);
             Controls.Add(textBox1);
@@ -142,6 +252,10 @@ namespace MiView
             tbMain.ResumeLayout(false);
             statusStrip1.ResumeLayout(false);
             statusStrip1.PerformLayout();
+            pnMain.ResumeLayout(false);
+            pnMain.PerformLayout();
+            pnSub.ResumeLayout(false);
+            tabControl1.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
@@ -157,5 +271,14 @@ namespace MiView
         private TextBox textBox1;
         private ComboBox cmbInstanceSelect;
         private Button cmdAddInstance;
+        private Panel pnMain;
+        private Label lblUser;
+        private TextBox txtDetail;
+        private Label lblUpdatedAt;
+        private Label lblSoftware;
+        private Panel pnSub;
+        private TabControl tabControl1;
+        private TabPage tpNotification;
+        private TabPage tpDebug;
     }
 }
