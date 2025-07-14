@@ -2,6 +2,7 @@
 using MiView.Common.TimeLine;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
@@ -16,11 +17,19 @@ namespace MiView.Common.AnalyzeData
     /// </summary>
     internal class ChannelToTimeLineData
     {
-        public static JsonNode? ResponseType(JsonNode Input) { return Input["type"]; }
-        public static JsonNode? ResponseBody(JsonNode Input) { return Input["body"]; }
-        public static JsonNode? ResponseId(JsonNode Input) { return ResponseBody(Input)?["id"]; }
-        public static JsonNode? ResponseNoteType(JsonNode Input) { return ResponseBody(Input)?["type"]; }
-        public static Note Note(JsonNode Input) { return new Note() { Node = ResponseBody(Input)?["body"] }; }
+        public static ChannelToTimeLineData Get(JsonNode Input) { return new ChannelToTimeLineData() { Node =  Input}; }
+        public JsonNode? Node { get; set; }
+        public JsonNode? ResponseType { get { return this.Node?["type"]; } }
+        public JsonNode? ResponseBody { get { return this.Node?["body"]; } }
+        public JsonNode? ResponseId { get { return this.ResponseBody?["id"]; } }
+        public JsonNode? ResponseNoteType { get { return this.ResponseBody?["type"]; } }
+        public Note Note { get { return new Note() { Node = this.ResponseBody?["body"] }; } }
+
+
+        //public static JsonNode? ResponseType(JsonNode? Input) { return Input?["type"]; }
+        //public static JsonNode? ResponseBody(JsonNode? Input) { return Input?["body"]; }
+        //public static JsonNode? ResponseId(JsonNode Input) { return ResponseBody(Input)?["id"]; }
+        //public static JsonNode? ResponseNoteType(JsonNode Input) { return ResponseBody(Input)?["type"]; }
 
 
 
@@ -42,22 +51,27 @@ namespace MiView.Common.AnalyzeData
             }
             TimeLineContainer Container = new TimeLineContainer();
 
-            string Protected = ChannelToTimeLineData.Note(Input).Visibility != null ? JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Visibility) : string.Empty;
-            Container.IDENTIFIED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).User.UserName) +
-                                   JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).User.Name) +
-                                   JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CreatedAt);
+            string Protected = ChannelToTimeLineData.Get(Input).Note.Visibility != null ? JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.Visibility) : string.Empty;
+            Container.IDENTIFIED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.UserName) +
+                                   JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Name) +
+                                   JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.CreatedAt);
             Container.PROTECTED = StringToProtectedStatus(Protected);
-            Container.ISLOCAL = bool.Parse(JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).LocalOnly));
-            Container.RENOTED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).RenoteId) != string.Empty;
-            Container.REPLAYED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).ReplyId) != string.Empty;
+            Container.ISLOCAL = bool.Parse(JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.LocalOnly));
+            Container.RENOTED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.RenoteId) != string.Empty;
+            Container.REPLAYED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.ReplyId) != string.Empty;
             // Container.CW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CW) != string.Empty;
-            Container.ISCHANNEL = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).ChannelId) != string.Empty;
-            Container.CHANNEL_NAME = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Channel.Name);
+            Container.ISCHANNEL = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.ChannelId) != string.Empty;
+            Container.CHANNEL_NAME = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.Channel.Name);
             // Container.DETAIL = Container.CW ? JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CW) : JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Text);
-            Container.USERID = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).User.UserName);
-            Container.USERNAME = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).User.Name);
-            Container.UPDATEDAT = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CreatedAt);
+            Container.USERID = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.UserName);
+            Container.USERNAME = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Name);
+            Container.UPDATEDAT = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.CreatedAt);
+            Container.SOFTWARE = (ChannelToTimeLineData.Get(Input).Note.User.Instance.IsInvalidatedVersion ? "[☆]" : "") +
+                                 JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Instance.SoftwareName) +
+                                 JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Instance.SoftwareVersion);
             Container.TLFROM = OriginalHost;
+            Container.ORIGINAL = Input;
+            Container.ORIGINAL_HOST = OriginalHost;
 
             GetCW(Input, ref Container);
             GetDetail(Input, ref Container);
@@ -68,20 +82,20 @@ namespace MiView.Common.AnalyzeData
 
         private static void GetCW(JsonNode Input, ref TimeLineContainer Container)
         {
-            Container.CW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CW) != string.Empty ||
-                           JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Renote.CW) != string.Empty;
+            Container.CW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.CW) != string.Empty ||
+                           JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.Renote.CW) != string.Empty;
         }
 
         private static void GetDetail(JsonNode Input, ref TimeLineContainer Container)
         {
-            string CW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CW);
-            string ReNoteCW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Renote.CW);
+            string CW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.CW);
+            string ReNoteCW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.Renote.CW);
 
-            string NoteText = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Text);
-            string ReNoteText = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Renote.Text);
+            string NoteText = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.Text);
+            string ReNoteText = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.Renote.Text);
 
-            string ReNoteSourceUser = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Renote.User.UserName);
-            string ReNoteSourceUserName = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Renote.User.Name);
+            string ReNoteSourceUser = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.Renote.User.UserName);
+            string ReNoteSourceUserName = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.Renote.User.Name);
 
             // Renoteのみ
             if (Container.RENOTED && NoteText == string.Empty)

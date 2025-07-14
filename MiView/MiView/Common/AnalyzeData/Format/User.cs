@@ -20,6 +20,7 @@ namespace MiView.Common.AnalyzeData.Format
         public JsonNode? IsBot { get { return this.Node?["isBot"]; } }
         public JsonNode? IsCat { get { return this.Node?["isCat"]; } }
         public JsonNode? Emojis { get { return this.Node?["emojis"]; } }
+        public Instance Instance { get { return new Instance() { Node = this.Node?["instance"] }; } }
         public JsonNode? OnlineStatus { get { return this.Node?["onlineStatus"]; } }
         public JsonNode? Roles { get { return this.Node?["badgeRoles"]; } }
     }

@@ -1,4 +1,5 @@
-﻿using MiView.Common.Fonts;
+﻿using MiView.Common.AnalyzeData;
+using MiView.Common.Fonts;
 using MiView.Common.Fonts.Material;
 using System;
 using System.Collections.Generic;
@@ -6,6 +7,7 @@ using System.ComponentModel;
 using System.DirectoryServices.ActiveDirectory;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using static MiView.Common.TimeLine.TimeLineCreator;
 
@@ -104,9 +106,17 @@ namespace MiView.Common.TimeLine
             /// </summary>
             SOFTWARE,
             /// <summary>
+            /// ソフトウェア偽装有無
+            /// </summary>
+            SOFTWARE_INVALIDATED,
+            /// <summary>
             /// 投稿元オリジナルjson情報
             /// </summary>
             ORIGINAL,
+            /// <summary>
+            /// 投稿元オリジナルホスト
+            /// </summary>
+            ORIGINAL_HOST,
             /// <summary>
             /// 読み取り元
             /// </summary>
@@ -129,9 +139,13 @@ namespace MiView.Common.TimeLine
             TIMELINE_ELEMENT.CHANNEL_NAME,
             TIMELINE_ELEMENT.ISCHANNEL,
             // TIMELINE_ELEMENT.TLFROM,
+            TIMELINE_ELEMENT.SOFTWARE_INVALIDATED,
+            TIMELINE_ELEMENT.ORIGINAL_HOST,
         };
 
         public List<TimeLineContainer> TimeLineData = new List<TimeLineContainer>();
+
+        private MainForm? _MainForm { get; set; }
 
         /// <summary>
         /// タイムライン管理オブジェクト
@@ -149,7 +163,7 @@ namespace MiView.Common.TimeLine
         /// <param name="Definition"></param>
         /// <returns></returns>
         /// <exception cref="KeyNotFoundException"></exception>
-        public DataGridTimeLine GetTimeLineObjectDirect(ref Form MainForm, string Definition)
+        public DataGridTimeLine GetTimeLineObjectDirect(ref MainForm MainForm, string Definition)
         {
             if (!this.Grids.ContainsKey(Definition))
             {
@@ -162,12 +176,14 @@ namespace MiView.Common.TimeLine
         /// メインフォームへタイムラインを追加
         /// </summary>
         /// <param name="MainForm"></param>
-        public void CreateTimeLine(ref Form MainForm, string Definition, string? ChildDefinition = null)
+        public void CreateTimeLine(ref MainForm MainForm, string Definition, string? ChildDefinition = null)
         {
             // コントロールがあるか検索
             var tpObj = GetControlFromMainForm(ref MainForm, ChildDefinition);
             if (tpObj != null)
             {
+                this._MainForm = MainForm;
+
                 System.Diagnostics.Debug.WriteLine("hoge");
                 DataGridTimeLine Grid = new DataGridTimeLine();
                 ((System.ComponentModel.ISupportInitialize)Grid).BeginInit();
@@ -197,6 +213,8 @@ namespace MiView.Common.TimeLine
 
                 this.AddDbg(Grid);
 
+                Grid.CurrentCellChanged += CurrentGridCellChanged;
+
                 tpObj.Controls.Add(Grid);
                 Grids.Add(Definition, Grid);
             }
@@ -206,7 +224,43 @@ namespace MiView.Common.TimeLine
             }
         }
 
-        public void CreateTimeLineTab(ref Form MainForm, string Name, string Text)
+        private void CurrentGridCellChanged(object? sender, EventArgs e)
+        {
+            // Object未セット
+            if (this._MainForm == null || sender == null)
+            {
+                return;
+            }
+            var Grid = (DataGridTimeLine)sender;
+
+            if (Grid.Visible == false)
+            {
+                return;
+            }
+
+            var CurrentCell = Grid.CurrentCell;
+            var CurrentRow = Grid.CurrentRow;
+
+            // 初期読み込み時
+            if (CurrentCell == null || CurrentRow == null)
+            {
+                return;
+            }
+
+            var CurrentRowData = Grid.Rows[CurrentRow.Index];
+            string OriginalHost = CurrentRowData.Cells[(int)TIMELINE_ELEMENT.ORIGINAL_HOST].Value.ToString() ?? string.Empty;
+            var Node = CurrentRowData.Cells[(int)TIMELINE_ELEMENT.ORIGINAL].Value;
+
+            if (Node == null || Node.ToString() == string.Empty)
+            {
+                return;
+            }
+
+            // TL情報をセット
+            this._MainForm.SetTimeLineContents(OriginalHost, (JsonNode)Node);
+        }
+
+        public void CreateTimeLineTab(ref MainForm MainForm, string Name, string Text)
         {
             var tpObj = GetControlFromMainForm(ref MainForm, null);
             if (tpObj != null)
@@ -227,7 +281,7 @@ namespace MiView.Common.TimeLine
             }
         }
 
-        private Control? GetControlFromMainForm(ref Form MainForm, string? ChildDefinition)
+        private Control? GetControlFromMainForm(ref MainForm MainForm, string? ChildDefinition)
         {
             var tpObj = MainForm.Controls.Cast<Control>().ToList().Find(r => { return r.Name == "tbMain"; });
             if (ChildDefinition != null)
@@ -422,7 +476,7 @@ namespace MiView.Common.TimeLine
         /// <param name="ChildDefinition"></param>
         /// <exception cref="TimeLineNotFoundException"></exception>
         /// <exception cref="KeyNotFoundException"></exception>
-        public void DeleteTimeLine(ref Form MainForm, string Definition, string? ChildDefinition = null)
+        public void DeleteTimeLine(ref MainForm MainForm, string Definition, string? ChildDefinition = null)
         {
             if (!this.Grids.ContainsKey(Definition))
             {
@@ -522,7 +576,9 @@ namespace MiView.Common.TimeLine
         public string UPDATEDAT { get; set; } = string.Empty;
         public string SOURCE { get; set; } = string.Empty;
         public string SOFTWARE { get; set; } = string.Empty;
-        public string ORIGINAL { get; set; } = string.Empty;
+        public bool SOFTWARE_INVALIDATED { get; set; } = false;
+        public JsonNode ORIGINAL { get; set; } = string.Empty;
+        public string ORIGINAL_HOST {  get; set; } = string.Empty;
         public string TLFROM { get; set; } = string.Empty;
     }
 
@@ -647,6 +703,10 @@ namespace MiView.Common.TimeLine
             }
         }
 
+        private void GridCurrentCllChanged(object? sender, EventArgs e)
+        {
+        }
+
         /// <summary>
         /// 行挿入
         /// </summary>
@@ -724,7 +784,8 @@ namespace MiView.Common.TimeLine
                 ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.RENOTED &&
                 ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.CW &&
                 ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.ISCHANNEL &&
-                ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.CHANNEL_NAME)
+                ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.CHANNEL_NAME &&
+                ColumnIndex != (int)TimeLineCreator.TIMELINE_ELEMENT.SOFTWARE_INVALIDATED)
             {
                 return;
             }
@@ -816,6 +877,14 @@ namespace MiView.Common.TimeLine
                                 = this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.CHANNEL_NAME].Value.ToString();
                     }
                     break;
+                case (int)TimeLineCreator.TIMELINE_ELEMENT.SOFTWARE_INVALIDATED:
+                    if (this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.SOFTWARE_INVALIDATED].Value != null &&
+                        (bool)this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.SOFTWARE_INVALIDATED].Value == true)
+                    {
+                        this.Rows[RowIndex].Cells[(int)TimeLineCreator.TIMELINE_ELEMENT.SOFTWARE].ToolTipText
+                                = "ソフトウェア偽装の可能性あり";
+                    }
+                    break;
             }
         }
 
@@ -863,6 +932,19 @@ namespace MiView.Common.TimeLine
         private void ChangeDispBgColorCommon(ref DataGridViewRow Row, Color DesignColor)
         {
             Row.DefaultCellStyle.BackColor = DesignColor;
+        }
+    }
+
+    /// <summary>
+    /// メインフォームと連携するためのイベントArgs
+    /// </summary>
+    internal class CurrentGridCellEventArgs : EventArgs
+    {
+        private MainForm _CurrentForm;
+
+        public CurrentGridCellEventArgs(MainForm CurrentForm)
+        {
+            _CurrentForm = CurrentForm;
         }
     }
 }
