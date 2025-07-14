@@ -41,8 +41,8 @@
 - misskey.io (2024.5.0-io.10)
 - misskey.niri.la (2025.4.1-kinel.2)
 - buicha.social (2025.4.1-buiso.2)
-- misskey.shinanoji.xyz (vanilla)
-- mi.ruruke.moe (misskey-tempura)
+- misskey.shinanoji.xyz (2025.6.0)
+- mi.ruruke.moe (2025.7.0-beta.1-tempura-1.9.2-dev+ruru-6fa9d22552)
 - misskey.flowers (2025.6.4-hanami.27877+5a90a40ca0)
 
 ## 元ネタとの違い
