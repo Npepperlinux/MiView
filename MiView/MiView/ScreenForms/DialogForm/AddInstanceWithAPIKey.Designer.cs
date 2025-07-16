@@ -35,6 +35,8 @@
             cmdApply = new Button();
             label3 = new Label();
             txtTabName = new TextBox();
+            cmbTLKind = new ComboBox();
+            label4 = new Label();
             SuspendLayout();
             // 
             // label1
@@ -71,7 +73,7 @@
             // 
             // cmdApply
             // 
-            cmdApply.Location = new Point(373, 100);
+            cmdApply.Location = new Point(373, 141);
             cmdApply.Name = "cmdApply";
             cmdApply.Size = new Size(75, 23);
             cmdApply.TabIndex = 2;
@@ -95,14 +97,35 @@
             txtTabName.Size = new Size(348, 23);
             txtTabName.TabIndex = 1;
             // 
+            // cmbTLKind
+            // 
+            cmbTLKind.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbTLKind.FormattingEnabled = true;
+            cmbTLKind.Items.AddRange(new object[] { "ホームTL", "ローカルTL", "ソーシャルTL", "グローバルTL" });
+            cmbTLKind.Location = new Point(100, 93);
+            cmbTLKind.Name = "cmbTLKind";
+            cmbTLKind.Size = new Size(348, 23);
+            cmbTLKind.TabIndex = 3;
+            // 
+            // label4
+            // 
+            label4.AutoSize = true;
+            label4.Location = new Point(12, 96);
+            label4.Name = "label4";
+            label4.Size = new Size(43, 15);
+            label4.TabIndex = 0;
+            label4.Text = "TL種類";
+            // 
             // AddInstanceWithAPIKey
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(460, 135);
+            ClientSize = new Size(460, 176);
+            Controls.Add(cmbTLKind);
             Controls.Add(cmdApply);
             Controls.Add(txtTabName);
             Controls.Add(txtAPIKey);
+            Controls.Add(label4);
             Controls.Add(label3);
             Controls.Add(txtInstanceURL);
             Controls.Add(label2);
@@ -122,5 +145,7 @@
         private Button cmdApply;
         private Label label3;
         private TextBox txtTabName;
+        private ComboBox cmbTLKind;
+        private Label label4;
     }
 }

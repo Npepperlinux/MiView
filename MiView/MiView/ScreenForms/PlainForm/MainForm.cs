@@ -1,6 +1,7 @@
 using MiView.Common.AnalyzeData;
 using MiView.Common.Connection.WebSocket;
 using MiView.Common.Connection.WebSocket.Event;
+using MiView.Common.Connection.WebSocket.Misskey.v2025;
 using MiView.Common.Fonts;
 using MiView.Common.Fonts.Material;
 using MiView.Common.TimeLine;
@@ -10,6 +11,7 @@ using System.Reflection;
 using System.Security.Policy;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Windows.Forms;
 
 namespace MiView
 {
@@ -39,6 +41,7 @@ namespace MiView
             this.pnSub.Visible = false;
             this.pnMain.Location = new Point(this.pnMain.Location.X, this.pnMain.Location.Y + this.pnSub.Size.Height);
             this.tabControl1.Size = new Size(this.tabControl1.Size.Width, this.tabControl1.Size.Height + this.pnSub.Size.Height);
+            this.tbMain.Size = new Size(this.tbMain.Size.Width, this.tbMain.Size.Height + this.pnSub.Size.Height);
         }
 
         private void MainForm_Load(object sender, EventArgs e)
@@ -46,19 +49,36 @@ namespace MiView
             _TimeLineManage.CreateTimeLine(ref this.MainFormObj, "Main", "tpMain");
         }
 
-        public void AddTimeLine(string InstanceURL, string TabName, string APIKey)
+        public void AddTimeLine(string InstanceURL, string TabName, string APIKey, string sTLKind)
         {
             if (this.InvokeRequired)
             {
-                this.Invoke(AddTimeLine, InstanceURL, TabName, APIKey);
+                this.Invoke(AddTimeLine, InstanceURL, TabName, APIKey, sTLKind);
                 return;
+            }
+
+            var TLKind = WebSocketTimeLineCommon.ConnectTimeLineKind.None;
+            switch (sTLKind)
+            {
+                case "ホームTL":
+                    TLKind = WebSocketTimeLineCommon.ConnectTimeLineKind.Home;
+                    break;
+                case "ソーシャルTL":
+                    TLKind = WebSocketTimeLineCommon.ConnectTimeLineKind.Social;
+                    break;
+                case "ローカルTL":
+                    TLKind = WebSocketTimeLineCommon.ConnectTimeLineKind.Local;
+                    break;
+                case "グローバルTL":
+                    TLKind = WebSocketTimeLineCommon.ConnectTimeLineKind.Global;
+                    break;
             }
 
             // タブ追加
             _TimeLineManage.CreateTimeLineTab(ref this.MainFormObj, InstanceURL, TabName);
             _TimeLineManage.CreateTimeLine(ref this.MainFormObj, InstanceURL, InstanceURL);
 
-            var WSManager = WebSocketTimeLineHome.OpenTimeLine(InstanceURL, APIKey);
+            var WSManager = WebSocketTimeLineCommon.CreateInstance(TLKind).OpenTimeLine(InstanceURL, APIKey);
             if (WSManager.GetSocketState() != System.Net.WebSockets.WebSocketState.Open)
             {
                 MessageBox.Show("インスタンスの読み込みに失敗しました。");
@@ -66,7 +86,7 @@ namespace MiView
             }
             WSManager.SetDataGridTimeLine(_TimeLineManage.GetTimeLineObjectDirect(ref this.MainFormObj, "Main"));
             WSManager.SetDataGridTimeLine(_TimeLineManage.GetTimeLineObjectDirect(ref this.MainFormObj, InstanceURL));
-            WebSocketTimeLineHome.ReadTimeLineContinuous(WSManager);
+            WebSocketTimeLineCommon.ReadTimeLineContinuous(WSManager);
         }
 
         private void cmdAddInstance_Click(object sender, EventArgs e)
@@ -77,17 +97,23 @@ namespace MiView
 
         private void tbMain_SelectedIndexChanged(object sender, EventArgs e)
         {
-            ((TabControl)sender).SuspendLayout();
+            //((TabControl)sender).SuspendLayout();
 
             var TPages = ((TabControl)sender).TabPages;
             foreach (TabPage TPage in TPages)
             {
                 foreach (DataGridTimeLine DGView in TPage.Controls.Cast<Control>().ToList().FindAll(r => { return r.GetType() == typeof(DataGridTimeLine); }))
                 {
+                    DGView.Visible = true;
                     DGView.Visible = TPages.IndexOf(TPage) == ((TabControl)sender).SelectedIndex;
+
+                    if (DGView.Visible)
+                    {
+                        DGView.Refresh();
+                    }
                 }
             }
-            ((TabControl)sender).ResumeLayout(false);
+            //((TabControl)sender).ResumeLayout(false);
         }
 
         public void SetTimeLineContents(string OriginalHost, JsonNode Node)
@@ -112,6 +138,7 @@ namespace MiView
             string txtUserName = TL.USERNAME;
             string txtUserInstance = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Node).Note.User.Host ?? OriginalHost);
             this.lblUser.Text += "@" + txtUserId + "@" + txtUserInstance + "/" + txtUserName;
+            this.lblTLFrom.Text = "source:" + TL.TLFROM;
 
             //CW
             string txtCW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Node).Note.CW);

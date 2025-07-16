@@ -35,6 +35,18 @@ namespace MiView.ScreenForms.DialogForm
                 MessageBox.Show("インスタンスURLもしくはAPIキー、タブ名称が入力されていません。", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            string SelectTL = string.Empty;
+            if (cmbTLKind.SelectedItem == null || cmbTLKind.SelectedItem.ToString() == "")
+            {
+                MessageBox.Show("TLの種類を選択してください。", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            else
+            {
+#pragma warning disable CS8600 // Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。
+                SelectTL = cmbTLKind.SelectedItem.ToString();
+#pragma warning restore CS8600 // Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。
+            }
             _ = Task.Run(async () =>
             {
                 // URLが存在するかチェック
@@ -53,7 +65,7 @@ namespace MiView.ScreenForms.DialogForm
                 {
                 }
 
-                this._MainForm.AddTimeLine(txtInstanceURL.Text, txtTabName.Text, txtAPIKey.Text);
+                this._MainForm.AddTimeLine(txtInstanceURL.Text, txtTabName.Text, txtAPIKey.Text, SelectTL);
             });
         }
     }
