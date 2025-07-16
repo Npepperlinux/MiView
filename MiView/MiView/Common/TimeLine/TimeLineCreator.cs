@@ -714,7 +714,7 @@ namespace MiView.Common.TimeLine
         public void InsertTimeLineData(TimeLineContainer Container)
         {
             object lk = new object();
-            lock (this)
+            lock (lk)
             {
                 // TL統合
                 var Intg = this.Rows.Cast<DataGridViewRow>().Where(r => r.Cells[(int)TIMELINE_ELEMENT.IDENTIFIED].Value.Equals(Container.IDENTIFIED)).ToArray();
@@ -741,6 +741,7 @@ namespace MiView.Common.TimeLine
                 this.Rows[0].Cells[(int)TIMELINE_ELEMENT.RENOTED_DISP].Style.Font = DefaultMaterialFont;
                 this.Rows[0].Cells[(int)TIMELINE_ELEMENT.CW_DISP].Style.Font = DefaultMaterialFont;
                 this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISCHANNEL_DISP].Style.Font = DefaultMaterialFont;
+                DefaultMaterialFont.Dispose();
 
                 // カラム別処理
                 foreach (string ColName in Enum.GetNames(typeof(TimeLineCreator.TIMELINE_ELEMENT)))
