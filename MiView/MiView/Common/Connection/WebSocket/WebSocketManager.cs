@@ -35,7 +35,7 @@ namespace MiView.Common.Connection.WebSocket
         /// <summary>
         /// APIKey
         /// </summary>
-        protected string _APIKey
+        protected string? _APIKey
         {
             get; set;
         }
@@ -293,12 +293,12 @@ namespace MiView.Common.Connection.WebSocket
         /// <param name="InstanceURL"></param>
         /// <param name="APIKey"></param>
         /// <returns></returns>
-        protected string GetWSURL(string InstanceURL, string APIKey)
+        protected string GetWSURL(string InstanceURL, string? APIKey)
         {
             this._HostDefinition = InstanceURL;
             this._APIKey = APIKey;
 
-            return string.Format("wss://{0}/streaming?i={1}", InstanceURL, APIKey);
+            return APIKey != null ? string.Format("wss://{0}/streaming?i={1}", InstanceURL, APIKey) : string.Format("wss://{0}/streaming", InstanceURL);
         }
 
         public event EventHandler<EventArgs> ConnectionLost;

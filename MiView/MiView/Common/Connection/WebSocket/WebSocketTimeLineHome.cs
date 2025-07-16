@@ -13,7 +13,7 @@ namespace MiView.Common.Connection.WebSocket
 {
     internal class WebSocketTimeLineHome : WebSocketManager
     {
-        public static WebSocketTimeLineHome OpenTimeLine(string InstanceURL, string ApiKey)
+        public static WebSocketTimeLineHome OpenTimeLine(string InstanceURL, string? ApiKey)
         {
             // WS取得
             WebSocketTimeLineHome WSTimeLine = new WebSocketTimeLineHome();
@@ -134,7 +134,7 @@ namespace MiView.Common.Connection.WebSocket
                         {
                             System.Diagnostics.Debug.WriteLine(WSTimeLine.GetSocketClient().State);
                         }
-                        if (WSTimeLine.GetSocketClient().State == WebSocketState.Closed && WSTimeLine._HostUrl != null)
+                        if (WSTimeLine.GetSocketClient().State != WebSocketState.Open && WSTimeLine._HostUrl != null)
                         {
                             // 再接続
                             await WSTimeLine.GetSocketClient().ConnectAsync(new Uri(WSTimeLine._HostUrl), CancellationToken.None);
