@@ -1,47 +1,98 @@
-﻿using MiView.Common.AnalyzeData;
-using MiView.Common.Connection.WebSocket.Event;
+﻿using MiView.Common.Connection.WebSocket.Event;
 using MiView.Common.Connection.WebSocket.Structures;
 using MiView.Common.TimeLine;
 using System.Net.WebSockets;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
+using MiView.Common.AnalyzeData;
 
-namespace MiView.Common.Connection.WebSocket
+namespace MiView.Common.Connection.WebSocket.Misskey.v2025
 {
-    internal class WebSocketTimeLineHome : WebSocketManager
+    abstract class WebSocketTimeLineCommon : WebSocketManager
     {
-        public static WebSocketTimeLineHome OpenTimeLine(string InstanceURL, string? ApiKey)
-        {
-            // WS取得
-            WebSocketTimeLineHome WSTimeLine = new WebSocketTimeLineHome();
+        /// <summary>
+        /// 接続識別子
+        /// </summary>
+        abstract protected ConnectMainBody? _WebSocketConnectionObj { get; }
 
+        /// <summary>
+        /// 接続先タイムライン
+        /// </summary>
+        protected ConnectTimeLineKind _TLKind
+        {
+            set; get;
+        } = ConnectTimeLineKind.None;
+
+        /// <summary>
+        /// 接続先タイムライン指定
+        /// </summary>
+        public enum ConnectTimeLineKind
+        {
+            None,
+            Home,
+            Social,
+            Global,
+        }
+
+        /// <summary>
+        /// インスタンス作成
+        /// </summary>
+        /// <returns></returns>
+        public static WebSocketTimeLineCommon CreateInstance(ConnectTimeLineKind TLKind)
+        {
+            switch(TLKind)
+            {
+                case ConnectTimeLineKind.None:
+                    break;
+                case ConnectTimeLineKind.Home:
+                    return new WebSocketTimeLineHome();
+                case ConnectTimeLineKind.Social:
+                    break;
+                case ConnectTimeLineKind.Global:
+                    break;
+            }
+            return null;
+        }
+
+        // あとで
+        //public WebSocketTimeLineCommon OpenTimeLine(ConnectTimeLineKind TLKind, string InstanceURL, string? ApiKey)
+        //{
+        //}
+
+        /// <summary>
+        /// タイムライン展開
+        /// </summary>
+        /// <param name="InstanceURL"></param>
+        /// <param name="ApiKey"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        public WebSocketTimeLineCommon OpenTimeLine(string InstanceURL, string? ApiKey)
+        {
             // タイムライン用WebSocket Open
-            WSTimeLine.Start(WSTimeLine.GetWSURL(InstanceURL, ApiKey));
-            if (WSTimeLine.GetSocketClient() == null)
+            this.Start(this.GetWSURL(InstanceURL, ApiKey));
+            if (this.GetSocketClient() == null || this._WebSocketConnectionObj == null)
             {
                 throw new InvalidOperationException("connection is not opened.");
             }
 
             int RetryCnt = 0;
-            while (WSTimeLine.IsStandBySocketOpen())
+            while (this.IsStandBySocketOpen())
             {
                 Thread.Sleep(1000);
                 RetryCnt++;
                 if (RetryCnt > 10)
                 {
-                    if (WSTimeLine.GetSocketState() != WebSocketState.Open)
+                    if (this.GetSocketState() != WebSocketState.Open)
                     {
-                        WSTimeLine.OnConnectionLost(WSTimeLine, new EventArgs());
+                        this.OnConnectionLost(this, new EventArgs());
                     }
                 }
             }
 
             // チャンネル接続用
             ConnectMain SendObj = new ConnectMain();
-            ConnectMainBody SendBody = new ConnectMainBody() { channel = "homeTimeline", id = "hoge" };
+            ConnectMainBody SendBody = this._WebSocketConnectionObj;
             SendObj.type = "connect";
             SendObj.body = SendBody;
 
@@ -49,27 +100,34 @@ namespace MiView.Common.Connection.WebSocket
             var Buffers = new ArraySegment<byte>(SendBytes);
 
             // ソケットのステータスを一旦リセットする(同じソケット使うので)
-            WSTimeLine.SetSocketState(WebSocketState.None);
+            this.SetSocketState(WebSocketState.None);
             Task.Run(async () =>
             {
                 // 本チャンのwebsocket接続
-                await WSTimeLine.GetSocketClient().SendAsync(Buffers, WebSocketMessageType.Text, true, CancellationToken.None);
+                await this.GetSocketClient().SendAsync(Buffers, WebSocketMessageType.Text, true, CancellationToken.None);
             });
-            while (WSTimeLine.IsStandBySocketOpen())
+            while (this.IsStandBySocketOpen())
             {
             }
 
-            return WSTimeLine;
+            return this;
         }
 
-        public WebSocketTimeLineHome OpenTimeLineDynamic(string InstanceURL, string ApiKey)
+        /// <summary>
+        /// タイムライン展開(持続的)
+        /// </summary>
+        /// <param name="InstanceURL"></param>
+        /// <param name="ApiKey"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        public WebSocketTimeLineCommon OpenTimeLineDynamic(string InstanceURL, string ApiKey)
         {
             // WS取得
-            WebSocketTimeLineHome WSTimeLine = new WebSocketTimeLineHome();
+            WebSocketTimeLineCommon WSTimeLine = WebSocketTimeLineCommon.CreateInstance(this._TLKind);
 
             // タイムライン用WebSocket Open
             this.Start(WSTimeLine.GetWSURL(InstanceURL, ApiKey));
-            if (this.GetSocketClient() == null)
+            if (this.GetSocketClient() == null || this._WebSocketConnectionObj == null)
             {
                 throw new InvalidOperationException("connection is not opened.");
             }
@@ -89,7 +147,7 @@ namespace MiView.Common.Connection.WebSocket
 
             // チャンネル接続用
             ConnectMain SendObj = new ConnectMain();
-            ConnectMainBody SendBody = new ConnectMainBody() { channel = "homeTimeline", id = "hoge" };
+            ConnectMainBody SendBody = this._WebSocketConnectionObj;
             SendObj.type = "connect";
             SendObj.body = SendBody;
 
@@ -114,7 +172,7 @@ namespace MiView.Common.Connection.WebSocket
         /// タイムライン取得
         /// </summary>
         /// <param name="WSTimeLine"></param>
-        public static void ReadTimeLineContinuous(WebSocketTimeLineHome WSTimeLine)
+        public static void ReadTimeLineContinuous(WebSocketTimeLineCommon WSTimeLine)
         {
             // バッファは多めに取っておく(どうせあとでカットする)
             var ResponseBuffer = new byte[4096 * 4];
@@ -157,7 +215,7 @@ namespace MiView.Common.Connection.WebSocket
                             WSTimeLine.CallDataReceived(ResponseMessage);
                         }
                     }
-                    catch(Exception ce)
+                    catch (Exception ce)
                     {
                         System.Diagnostics.Debug.WriteLine("receive failed");
                         System.Diagnostics.Debug.WriteLine(WSTimeLine._HostUrl);
@@ -181,18 +239,23 @@ namespace MiView.Common.Connection.WebSocket
             System.Diagnostics.Debug.WriteLine(Response);
         }
 
+        /// <summary>
+        /// 接続喪失時
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         protected override void OnConnectionLost(object? sender, EventArgs e)
         {
             if (sender == null)
             {
                 return;
             }
-            if (sender.GetType() != typeof(WebSocketTimeLineHome))
+            if (sender.GetType() != typeof(WebSocketTimeLineCommon))
             {
                 return;
             }
             // オープンを待つ
-            WebSocketTimeLineHome WS = (WebSocketTimeLineHome)sender;
+            WebSocketTimeLineCommon WS = (WebSocketTimeLineCommon)sender;
             while (WS.GetSocketState() != WebSocketState.Open)
             {
                 // 1分おき
@@ -205,7 +268,7 @@ namespace MiView.Common.Connection.WebSocket
                 catch (Exception)
                 {
                 }
-                System.Diagnostics.Debug.WriteLine("現在の状態：" + ((WebSocketTimeLineHome)sender).GetSocketClient().State);
+                System.Diagnostics.Debug.WriteLine("現在の状態：" + ((WebSocketTimeLineCommon)sender).GetSocketClient().State);
             }
             if (WS == null)
             {
@@ -213,8 +276,9 @@ namespace MiView.Common.Connection.WebSocket
                 return;
             }
 
-            WebSocketTimeLineHome.ReadTimeLineContinuous(WS);
+            ReadTimeLineContinuous(WS);
         }
+
         protected override void OnDataReceived(object? sender, ConnectDataReceivedEventArgs e)
         {
             if (this._TimeLineObject == null)
@@ -241,7 +305,7 @@ namespace MiView.Common.Connection.WebSocket
                     {
                         DGrid.Invoke(() => { DGrid.InsertTimeLineData(ChannelToTimeLineContainer.ConvertTimeLineContainer(this._HostDefinition, t)); });
                     }
-                    catch(Exception ce)
+                    catch (Exception ce)
                     {
                         System.Diagnostics.Debug.WriteLine(ce.ToString());
                     }
