@@ -31,6 +31,7 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
         {
             None,
             Home,
+            Local,
             Social,
             Global,
         }
@@ -47,10 +48,12 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
                     break;
                 case ConnectTimeLineKind.Home:
                     return new WebSocketTimeLineHome();
+                case ConnectTimeLineKind.Local:
+                    return new WebSocketTimeLineLocal();
                 case ConnectTimeLineKind.Social:
-                    break;
+                    return new WebSocketTimeLineSocial();
                 case ConnectTimeLineKind.Global:
-                    break;
+                    return new WebSocketTimeLineGlobal();
             }
             return null;
         }
@@ -225,7 +228,7 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
                         {
                             Thread.Sleep(1000);
 
-                            WebSocketTimeLineHome.ReadTimeLineContinuous(WSTimeLine);
+                            WebSocketTimeLineCommon.ReadTimeLineContinuous(WSTimeLine);
                         }
 
                         WSTimeLine.CallConnectionLost();
