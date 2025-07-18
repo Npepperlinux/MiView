@@ -56,7 +56,15 @@ namespace MiView.Common.AnalyzeData
                                    JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Name) +
                                    JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.CreatedAt);
             Container.PROTECTED = StringToProtectedStatus(Protected);
-            Container.ISLOCAL = bool.Parse(JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.LocalOnly));
+            try
+            {
+                Container.ISLOCAL = bool.Parse(JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.LocalOnly));
+            }
+            catch (Exception)
+            {
+                // 取ってこれない時がある
+                Container.ISLOCAL = false;
+            }
             Container.RENOTED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.RenoteId) != string.Empty;
             Container.REPLAYED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.ReplyId) != string.Empty;
             // Container.CW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CW) != string.Empty;
@@ -65,6 +73,10 @@ namespace MiView.Common.AnalyzeData
             // Container.DETAIL = Container.CW ? JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CW) : JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Text);
             Container.USERID = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.UserName);
             Container.USERNAME = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Name);
+            if (Container.USERNAME == string.Empty)
+            {
+                Container.USERNAME = "[" + Container.USERID + "]";
+            }
             Container.UPDATEDAT = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.CreatedAt);
             Container.SOFTWARE = (ChannelToTimeLineData.Get(Input).Note.User.Instance.IsInvalidatedVersion ? "[☆]" : "") +
                                  JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Instance.SoftwareName) +

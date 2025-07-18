@@ -215,8 +215,23 @@ namespace MiView.Common.TimeLine
 
                 Grid.CurrentCellChanged += CurrentGridCellChanged;
 
-                tpObj.Controls.Add(Grid);
+                if (tpObj.InvokeRequired)
+                {
+                    tpObj.Invoke(() => {
+                        tpObj.Controls.Add(Grid);
+                    });
+                }
+                else
+                {
+                    tpObj.Controls.Add(Grid);
+                }
                 Grids.Add(Definition, Grid);
+
+                //tpObj.Select();
+                if (tpObj.GetType() == typeof(TabPage))
+                {
+                    this._MainForm.SelectTabPage(tpObj.Name);
+                }
             }
             else
             {
@@ -277,7 +292,22 @@ namespace MiView.Common.TimeLine
                 tp.Text = Text;
                 tp.UseVisualStyleBackColor = true;
 
-                tpObj.Controls.Add(tp);
+                if (tpObj.InvokeRequired)
+                {
+                    tpObj.Invoke(() => { tpObj.Controls.Add(tp); });
+                }
+                else
+                {
+                    tpObj.Controls.Add(tp);
+                }
+                if (MainForm.InvokeRequired)
+                {
+                    MainForm.Invoke(() => { tp.Focus(); });
+                }
+                else
+                {
+                    tp.Focus();
+                }
             }
         }
 
@@ -670,7 +700,8 @@ namespace MiView.Common.TimeLine
         /// </summary>
         public DataGridTimeLine()
         {
-            this.DoubleBuffered = true;
+            // コントロールが黒くなる不具合ある
+            // this.DoubleBuffered = true;
 
             // 初期設定
             var DefaultMaterialFont = new FontLoader().LoadFontFromFile(FontLoader.FONT_SELECTOR.MATERIALICONS, 8);
@@ -711,60 +742,81 @@ namespace MiView.Common.TimeLine
         /// <param name="Container"></param>
         public void InsertTimeLineData(TimeLineContainer Container)
         {
-            this.SuspendLayout();
-
-            // TL統合
-            var Intg = this.Rows.Cast<DataGridViewRow>().Where(r => r.Cells[(int)TIMELINE_ELEMENT.IDENTIFIED].Value.Equals(Container.IDENTIFIED)).ToArray();
-            if (Intg.Count() > 0)
+            try
             {
-                (Intg[0]).Cells[(int)TIMELINE_ELEMENT.TLFROM].Value = (Intg[0]).Cells[(int)TIMELINE_ELEMENT.TLFROM].Value.ToString() + Container.TLFROM;
-                this.ResumeLayout();
-                return;
-            }
-
-
-            // 行挿入
-            this.Rows.Add();
-
-            int CurrentRowIndex = this.Rows.Count - 1;
-
-            // 基本行高さ
-            this.Rows[CurrentRowIndex].Height = 20;
-
-            // フォントは行ごとに定義する
-            // defaultだと反映されない
-            //var DefaultMaterialFont = new FontLoader().LoadFontFromFile(FontLoader.FONT_SELECTOR.MATERIALICONS, 12);
-            //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.REPLAYED_DISP].Style.Font = DefaultMaterialFont;
-            //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISLOCAL_DISP].Style.Font = DefaultMaterialFont;
-            //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.PROTECTED_DISP].Style.Font = DefaultMaterialFont;
-            //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.RENOTED_DISP].Style.Font = DefaultMaterialFont;
-            //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.CW_DISP].Style.Font = DefaultMaterialFont;
-            //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISCHANNEL_DISP].Style.Font = DefaultMaterialFont;
-            //DefaultMaterialFont.Dispose();
-
-            // カラム別処理
-            foreach (string ColName in Enum.GetNames(typeof(TimeLineCreator.TIMELINE_ELEMENT)))
-            {
-                var Prop = typeof(TimeLineContainer).GetProperty(ColName);
-                if (Prop == null)
+                this.SuspendLayout();
+                // TL統合
+                var Intg = this.Rows.Cast<DataGridViewRow>().Where(r => r.Cells[(int)TIMELINE_ELEMENT.IDENTIFIED].Value.Equals(Container.IDENTIFIED)).ToArray();
+                if (Intg.Count() > 0)
                 {
-                    continue;
-                }
-                var PropVal = Prop.GetValue(Container);
-
-                if (PropVal != null)
-                {
-                    this.Rows[CurrentRowIndex].Cells[ColName].Value = PropVal;
+                    var CtlVal = (Intg[0]).Cells[(int)TIMELINE_ELEMENT.TLFROM].Value.ToString();
+                    if (CtlVal != string.Empty)
+                    {
+                        if (!CtlVal.Split(',').Contains(Container.TLFROM))
+                        {
+                            (Intg[0]).Cells[(int)TIMELINE_ELEMENT.TLFROM].Value = CtlVal + "," + Container.TLFROM;
+                        }
+                    }
+                    else
+                    {
+                        (Intg[0]).Cells[(int)TIMELINE_ELEMENT.TLFROM].Value = CtlVal + "," + Container.TLFROM;
+                    }
+                    //this.ResumeLayout();
+                    return;
                 }
 
-                this.ArrangeTimeLine(CurrentRowIndex, (int)Enum.Parse(typeof(TimeLineCreator.TIMELINE_ELEMENT), ColName));
 
-                var Row = this.Rows[CurrentRowIndex];
+                // 行挿入
+                this.Rows.Add();
 
-                // 色変更
-                this.ChangeDispColor(ref Row, Container);
+                int CurrentRowIndex = this.Rows.Count - 1;
+
+                // 基本行高さ
+                this.Rows[CurrentRowIndex].Height = 20;
+
+                // フォントは行ごとに定義する
+                // defaultだと反映されない
+                //var DefaultMaterialFont = new FontLoader().LoadFontFromFile(FontLoader.FONT_SELECTOR.MATERIALICONS, 12);
+                //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.REPLAYED_DISP].Style.Font = DefaultMaterialFont;
+                //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISLOCAL_DISP].Style.Font = DefaultMaterialFont;
+                //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.PROTECTED_DISP].Style.Font = DefaultMaterialFont;
+                //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.RENOTED_DISP].Style.Font = DefaultMaterialFont;
+                //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.CW_DISP].Style.Font = DefaultMaterialFont;
+                //this.Rows[0].Cells[(int)TIMELINE_ELEMENT.ISCHANNEL_DISP].Style.Font = DefaultMaterialFont;
+                //DefaultMaterialFont.Dispose();
+
+                // カラム別処理
+                foreach (string ColName in Enum.GetNames(typeof(TimeLineCreator.TIMELINE_ELEMENT)))
+                {
+                    var Prop = typeof(TimeLineContainer).GetProperty(ColName);
+                    if (Prop == null)
+                    {
+                        continue;
+                    }
+                    var PropVal = Prop.GetValue(Container);
+
+                    if (PropVal != null)
+                    {
+                        this.Rows[CurrentRowIndex].Cells[ColName].Value = PropVal;
+                    }
+
+                    this.ArrangeTimeLine(CurrentRowIndex, (int)Enum.Parse(typeof(TimeLineCreator.TIMELINE_ELEMENT), ColName));
+
+                    var Row = this.Rows[CurrentRowIndex];
+
+                    // 色変更
+                    this.ChangeDispColor(ref Row, Container);
+                }
+                this.ResumeLayout(false);
             }
-            this.ResumeLayout(false);
+            catch(Exception)
+            {
+            }
+            finally
+            {
+                this.ResumeLayout(false);
+            }
+            //this.Refresh();
         }
 
         /// <summary>
