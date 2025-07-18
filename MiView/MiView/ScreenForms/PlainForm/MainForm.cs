@@ -18,9 +18,14 @@ namespace MiView
     public partial class MainForm : Form
     {
         /// <summary>
+        /// タイムラインクリエータ
+        /// </summary>
+        private TimeLineCreator _TLCreator = new TimeLineCreator();
+
+        /// <summary>
         /// タイムラインマネージャ
         /// </summary>
-        private TimeLineCreator _TimeLineManage = new TimeLineCreator();
+        private Dictionary<string, WebSocketTimeLineCommon> _TLManager = new Dictionary<string, WebSocketTimeLineCommon>();
 
         /// <summary>
         /// このフォーム
@@ -44,9 +49,32 @@ namespace MiView
             this.tbMain.Size = new Size(this.tbMain.Size.Width, this.tbMain.Size.Height + this.pnSub.Size.Height);
         }
 
+        private List<DataGridTimeLine> DGrids = new List<DataGridTimeLine>();
+        private void TabUpdate()
+        {
+        }
+
         private void MainForm_Load(object sender, EventArgs e)
         {
-            _TimeLineManage.CreateTimeLine(ref this.MainFormObj, "Main", "tpMain");
+            _TLCreator.CreateTimeLine(ref this.MainFormObj, "Main", "tpMain");
+        }
+
+        public void SelectTabPage(string TabName)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(SelectTabPage, TabName);
+                return;
+            }
+            var Tb = this.tbMain.TabPages[TabName];
+            if (Tb == null)
+            {
+                return;
+            }
+            else
+            {
+                Tb.Select();
+            }
         }
 
         public void AddTimeLine(string InstanceURL, string TabName, string APIKey, string sTLKind)
@@ -74,19 +102,28 @@ namespace MiView
                     break;
             }
 
-            // タブ追加
-            _TimeLineManage.CreateTimeLineTab(ref this.MainFormObj, InstanceURL, TabName);
-            _TimeLineManage.CreateTimeLine(ref this.MainFormObj, InstanceURL, InstanceURL);
+            // タブ識別
+            var TabDef = System.Guid.NewGuid().ToString();
 
-            var WSManager = WebSocketTimeLineCommon.CreateInstance(TLKind).OpenTimeLine(InstanceURL, APIKey);
+            // タブ追加
+            _TLCreator.CreateTimeLineTab(ref this.MainFormObj, TabDef, TabName);
+            _TLCreator.CreateTimeLine(ref this.MainFormObj, TabDef, TabDef);
+
+            var WSManager = WebSocketTimeLineCommon.CreateInstance(TLKind).OpenTimeLine(TabDef, APIKey);
+            WSManager.SetDataGridTimeLine(_TLCreator.GetTimeLineObjectDirect(ref this.MainFormObj, "Main"));
+            WSManager.SetDataGridTimeLine(_TLCreator.GetTimeLineObjectDirect(ref this.MainFormObj, TabDef));
+            WebSocketTimeLineCommon.ReadTimeLineContinuous(WSManager);
+
+            if (APIKey != string.Empty)
+            {
+                var WTManager = WebSocketMain.CreateInstance().OpenMain(TabDef, APIKey);
+                WebSocketMain.ReadMainContinuous(WTManager);
+            }
             if (WSManager.GetSocketState() != System.Net.WebSockets.WebSocketState.Open)
             {
                 MessageBox.Show("インスタンスの読み込みに失敗しました。");
                 return;
             }
-            WSManager.SetDataGridTimeLine(_TimeLineManage.GetTimeLineObjectDirect(ref this.MainFormObj, "Main"));
-            WSManager.SetDataGridTimeLine(_TimeLineManage.GetTimeLineObjectDirect(ref this.MainFormObj, InstanceURL));
-            WebSocketTimeLineCommon.ReadTimeLineContinuous(WSManager);
         }
 
         private void cmdAddInstance_Click(object sender, EventArgs e)
@@ -105,12 +142,12 @@ namespace MiView
                 foreach (DataGridTimeLine DGView in TPage.Controls.Cast<Control>().ToList().FindAll(r => { return r.GetType() == typeof(DataGridTimeLine); }))
                 {
                     DGView.Visible = true;
-                    DGView.Visible = TPages.IndexOf(TPage) == ((TabControl)sender).SelectedIndex;
+                    // DGView.Visible = TPages.IndexOf(TPage) == ((TabControl)sender).SelectedIndex;
 
-                    if (DGView.Visible)
-                    {
-                        DGView.Refresh();
-                    }
+                    //if (DGView.Visible)
+                    //{
+                    //    DGView.Refresh();
+                    //}
                 }
             }
             //((TabControl)sender).ResumeLayout(false);

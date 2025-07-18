@@ -41,6 +41,7 @@ namespace MiView
             cmdAddInstance = new Button();
             pnMain = new Panel();
             txtDetail = new TextBox();
+            lblTLFrom = new Label();
             lblSoftware = new Label();
             lblUpdatedAt = new Label();
             lblUser = new Label();
@@ -48,7 +49,6 @@ namespace MiView
             tabControl1 = new TabControl();
             tpNotification = new TabPage();
             tpDebug = new TabPage();
-            lblTLFrom = new Label();
             tbMain.SuspendLayout();
             statusStrip1.SuspendLayout();
             pnMain.SuspendLayout();
@@ -162,6 +162,16 @@ namespace MiView
             txtDetail.Size = new Size(667, 95);
             txtDetail.TabIndex = 1;
             // 
+            // lblTLFrom
+            // 
+            lblTLFrom.AutoSize = true;
+            lblTLFrom.Font = new Font("Yu Gothic UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 128);
+            lblTLFrom.Location = new Point(113, 126);
+            lblTLFrom.Name = "lblTLFrom";
+            lblTLFrom.Size = new Size(129, 17);
+            lblTLFrom.TabIndex = 0;
+            lblTLFrom.Text = "misskey.io/misskey.io";
+            // 
             // lblSoftware
             // 
             lblSoftware.AutoSize = true;
@@ -233,16 +243,6 @@ namespace MiView
             tpDebug.TabIndex = 1;
             tpDebug.Text = "デバッグ";
             tpDebug.UseVisualStyleBackColor = true;
-            // 
-            // lblTLFrom
-            // 
-            lblTLFrom.AutoSize = true;
-            lblTLFrom.Font = new Font("Yu Gothic UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 128);
-            lblTLFrom.Location = new Point(113, 126);
-            lblTLFrom.Name = "lblTLFrom";
-            lblTLFrom.Size = new Size(129, 17);
-            lblTLFrom.TabIndex = 0;
-            lblTLFrom.Text = "misskey.io/misskey.io";
             // 
             // MainForm
             // 
