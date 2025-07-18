@@ -257,6 +257,7 @@ namespace MiView.Common.Connection.WebSocket
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"WebSocket operation error: {ex.Message}");
             }
         }
 
@@ -283,6 +284,7 @@ namespace MiView.Common.Connection.WebSocket
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"WebSocket operation error: {ex.Message}");
             }
         }
 

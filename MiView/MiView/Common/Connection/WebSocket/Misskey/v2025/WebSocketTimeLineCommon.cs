@@ -40,7 +40,7 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
         /// インスタンス作成
         /// </summary>
         /// <returns></returns>
-        public static WebSocketTimeLineCommon CreateInstance(ConnectTimeLineKind TLKind)
+        public static WebSocketTimeLineCommon? CreateInstance(ConnectTimeLineKind TLKind)
         {
             switch(TLKind)
             {
@@ -300,20 +300,29 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
 
             // ChannelToTimeLineData.Type(t);
 
-            foreach (DataGridTimeLine DGrid in this._TimeLineObject)
+            // Avalonia用にTimeLineContainerを作成してMainWindowに渡す
+            try
             {
-                if (DGrid.InvokeRequired)
-                {
-                    try
-                    {
-                        DGrid.Invoke(() => { DGrid.InsertTimeLineData(ChannelToTimeLineContainer.ConvertTimeLineContainer(this._HostDefinition, t)); });
-                    }
-                    catch (Exception ce)
-                    {
-                        System.Diagnostics.Debug.WriteLine(ce.ToString());
-                    }
-                }
+                var timelineContainer = ChannelToTimeLineContainer.ConvertTimeLineContainer(this._HostDefinition, t);
+                
+                // MainWindowに渡すためのイベントを発火
+                // 実際の実装では適切なイベントハンドラーを使用
+                OnTimeLineDataReceived(timelineContainer);
             }
+            catch (Exception ce)
+            {
+                System.Diagnostics.Debug.WriteLine(ce.ToString());
+            }
+        }
+
+        /// <summary>
+        /// タイムラインデータ受信時のイベント
+        /// </summary>
+        public event EventHandler<TimeLineContainer>? TimeLineDataReceived;
+        
+        protected virtual void OnTimeLineDataReceived(TimeLineContainer container)
+        {
+            TimeLineDataReceived?.Invoke(this, container);
         }
     }
 }

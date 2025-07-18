@@ -1,20 +1,15 @@
 ﻿using System;
 using System.CodeDom;
 using System.Collections.Generic;
-using System.Drawing.Text;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Avalonia.Media;
 
 namespace MiView.Common.Fonts
 {
     internal class FontLoader
     {
-        /// <summary>
-        /// ふぉんとコレクション
-        /// </summary>
-        private PrivateFontCollection _Fonts = new PrivateFontCollection();
-
         /// <summary>
         /// フォント格納先基準ディレクトリ
         /// </summary>
@@ -52,23 +47,68 @@ namespace MiView.Common.Fonts
         }
 
         /// <summary>
-        /// フォントデータをファイルから取得
+        /// フォントデータをファイルから取得 (Avalonia用)
         /// </summary>
         /// <param name="Selector">フォント指定</param>
         /// <param name="Size">フォントサイズ</param>
-        /// <returns>Font</returns>
+        /// <returns>FontFamily</returns>
         /// <exception cref="KeyNotFoundException">対応するフォントがない</exception>
-        public Font LoadFontFromFile(FONT_SELECTOR Selector, float Size)
+        public FontFamily LoadFontFamilyFromFile(FONT_SELECTOR Selector)
         {
             if (!this._FontPair.ContainsKey(Selector))
             {
                 throw new KeyNotFoundException();
             }
 
-            System.Drawing.Text.PrivateFontCollection Col = new System.Drawing.Text.PrivateFontCollection();
-            Col.AddFontFile(_FontDirectory + _FontPair[Selector]);
+            // Avalonia用のフォント読み込み
+            var fontPath = _FontDirectory + _FontPair[Selector];
+            
+            try
+            {
+                // ファイルが存在する場合はカスタムフォントを使用
+                if (System.IO.File.Exists(fontPath))
+                {
+                    return new FontFamily($"avares://MiView{fontPath}");
+                }
+                else
+                {
+                    // フォントファイルが見つからない場合はデフォルトフォントを返す
+                    return FontFamily.Default;
+                }
+            }
+            catch
+            {
+                // エラーの場合はデフォルトフォントを返す
+                return FontFamily.Default;
+            }
+        }
 
-            return new System.Drawing.Font(Col.Families[0], Size);
+        /// <summary>
+        /// Windows Forms互換のFont風メソッド (Avalonia用)
+        /// </summary>
+        /// <param name="Selector">フォント指定</param>
+        /// <param name="Size">フォントサイズ</param>
+        /// <returns>AvaloniaFont</returns>
+        /// <exception cref="KeyNotFoundException">対応するフォントがない</exception>
+        public AvaloniaFont LoadFontFromFile(FONT_SELECTOR Selector, float Size)
+        {
+            var fontFamily = LoadFontFamilyFromFile(Selector);
+            return new AvaloniaFont(fontFamily, Size);
+        }
+    }
+
+    /// <summary>
+    /// Avalonia用のFont代替クラス
+    /// </summary>
+    public class AvaloniaFont
+    {
+        public FontFamily FontFamily { get; }
+        public double Size { get; }
+
+        public AvaloniaFont(FontFamily fontFamily, double size)
+        {
+            FontFamily = fontFamily;
+            Size = size;
         }
     }
 }

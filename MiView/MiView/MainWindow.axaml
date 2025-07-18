@@ -7,33 +7,56 @@
     
     <DockPanel>
         <!-- メニューバー -->
-        <Menu DockPanel.Dock="Top" Background="White" Height="25">
-            <MenuItem Header="ファイル(_F)">
-                <MenuItem Header="終了(_X)" />
+        <Menu DockPanel.Dock="Top" Background="#F0F0F0" BorderBrush="#8C8C8C" BorderThickness="0,0,0,1" Height="25">
+            <MenuItem Header="ファイル(_F)" Background="#F0F0F0" Foreground="Black">
+                <MenuItem Header="終了(_X)" Background="White" Foreground="Black" />
             </MenuItem>
-            <MenuItem Header="表示(_V)" />
-            <MenuItem Header="ヘルプ(_H)" />
+            <MenuItem Header="表示(_V)" Background="#F0F0F0" Foreground="Black" />
+            <MenuItem Header="ヘルプ(_H)" Background="#F0F0F0" Foreground="Black" />
         </Menu>
         
         <!-- インスタンス選択とボタン -->
-        <Grid DockPanel.Dock="Top" Height="30" Background="White">
+        <Border DockPanel.Dock="Top" Height="30" Background="#F0F0F0" BorderBrush="#8C8C8C" BorderThickness="0,0,0,1">
+            <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="110"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="120"/>
             </Grid.ColumnDefinitions>
             
-            <Button x:Name="cmdAddInstance" 
-                    Grid.Column="0"
-                    Content="インスタンス追加"
-                    Margin="5,3"
-                    Click="cmdAddInstance_Click"/>
-            
             <ComboBox x:Name="cmbInstanceSelect" 
-                      Grid.Column="2"
+                      Grid.Column="0"
                       Margin="5,3"
+                      Background="White"
+                      BorderBrush="#8C8C8C"
+                      BorderThickness="1"
+                      Foreground="Black"
                       PlaceholderText="インスタンスを選択"/>
-        </Grid>
+            
+            <Button x:Name="cmdConnect" 
+                    Grid.Column="1"
+                    Content="接続"
+                    Margin="5,3"
+                    Background="White"
+                    BorderBrush="#8C8C8C"
+                    BorderThickness="1"
+                    Foreground="Black"
+                    Click="cmdConnect_Click"/>
+                    
+            <Button x:Name="cmdAddInstance" 
+                    Grid.Column="1"
+                    Content="+"
+                    Margin="95,3,5,3"
+                    Width="20"
+                    Height="20"
+                    Background="White"
+                    BorderBrush="#8C8C8C"
+                    BorderThickness="1"
+                    Foreground="Black"
+                    FontSize="14"
+                    FontWeight="Bold"
+                    Click="ShowAddInstanceDialog"/>
+            </Grid>
+        </Border>
         
         <!-- ステータスバー -->
         <Border DockPanel.Dock="Bottom" Background="#F0F0F0" BorderBrush="Gray" BorderThickness="0,1,0,0">
@@ -69,32 +92,6 @@
                  TextWrapping="Wrap"
                  Background="White"
                  Foreground="Black"/>
-        
-        <!-- サブタブ（通知・デバッグ） -->
-        <TabControl DockPanel.Dock="Bottom" Height="110" Margin="2" Background="White">
-            <TabItem Header="通知">
-                <ScrollViewer Background="White">
-                    <StackPanel Background="White" Margin="5">
-                        <TextBlock Text="通知はここに表示されます" 
-                                   Foreground="Gray" 
-                                   FontSize="12" 
-                                   HorizontalAlignment="Center" 
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-            <TabItem Header="デバッグ">
-                <ScrollViewer Background="White">
-                    <StackPanel Background="White" Margin="5">
-                        <TextBlock Text="デバッグ情報はここに表示されます" 
-                                   Foreground="Gray" 
-                                   FontSize="12" 
-                                   HorizontalAlignment="Center" 
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-        </TabControl>
         
         <!-- 詳細パネル -->
         <Border DockPanel.Dock="Bottom" 
@@ -165,57 +162,45 @@
             </Grid>
         </Border>
         
-        <!-- メインタブコントロール -->
-        <TabControl x:Name="tbMain" 
-                    Margin="2" 
-                    TabStripPlacement="Bottom"
-                    Background="White">
-            <TabItem Header="統合TL">
-                <Grid Background="White">
+        <!-- メインタブコントロール（Windows Forms風） -->
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- タブコンテンツ -->
+            <Border Grid.Row="0" 
+                    Background="White" 
+                    BorderBrush="#8C8C8C" 
+                    BorderThickness="1,1,1,0">
+                <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     
                     <!-- テーブルヘッダー -->
-                    <Grid Grid.Row="0" Background="#E0E0E0" Height="22">
+                    <Grid Grid.Row="0" Background="#E0E0E0" Height="20">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="60"/>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="80"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="150"/>
                             <ColumnDefinition Width="120"/>
                         </Grid.ColumnDefinitions>
                         
-                        <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="0,0,1,0">
-                            <TextBlock Text="type" FontWeight="Bold" FontSize="11" 
-                                       VerticalAlignment="Center" HorizontalAlignment="Left" 
-                                       Margin="3,0" Foreground="Black"/>
-                        </Border>
-                        <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="0,0,1,0">
-                            <TextBlock Text="channel" FontWeight="Bold" FontSize="11" 
-                                       VerticalAlignment="Center" HorizontalAlignment="Left" 
-                                       Margin="3,0" Foreground="Black"/>
-                        </Border>
-                        <Border Grid.Column="2" BorderBrush="Gray" BorderThickness="0,0,1,0">
-                            <TextBlock Text="timestamp" FontWeight="Bold" FontSize="11" 
-                                       VerticalAlignment="Center" HorizontalAlignment="Left" 
-                                       Margin="3,0" Foreground="Black"/>
-                        </Border>
-                        <Border Grid.Column="3" BorderBrush="Gray" BorderThickness="0,0,1,0">
-                            <TextBlock Text="content" FontWeight="Bold" FontSize="11" 
-                                       VerticalAlignment="Center" HorizontalAlignment="Left" 
-                                       Margin="3,0" Foreground="Black"/>
-                        </Border>
-                        <Border Grid.Column="4">
-                            <TextBlock Text="instance" FontWeight="Bold" FontSize="11" 
-                                       VerticalAlignment="Center" HorizontalAlignment="Left" 
-                                       Margin="3,0" Foreground="Black"/>
-                        </Border>
+                        <Border Grid.Column="0" BorderBrush="#8C8C8C" BorderThickness="0,0,1,0"/>
+                        <Border Grid.Column="1" BorderBrush="#8C8C8C" BorderThickness="0,0,1,0"/>
+                        <Border Grid.Column="2" BorderBrush="#8C8C8C" BorderThickness="0,0,1,0"/>
+                        <Border Grid.Column="3" BorderBrush="#8C8C8C" BorderThickness="0,0,1,0"/>
+                        <Border Grid.Column="4" BorderBrush="#8C8C8C" BorderThickness="0,0,1,0"/>
+                        <Border Grid.Column="5"/>
                     </Grid>
                     
-                    <!-- テーブルデータ -->
-                    <ScrollViewer Grid.Row="1" x:Name="timelineScrollViewer" Background="White">
+                    <!-- タイムライン -->
+                    <ScrollViewer Grid.Row="1" x:Name="timelineScrollViewer" Background="White" Padding="0">
                         <StackPanel x:Name="timelineContainer" Background="White">
                             <TextBlock Text="タイムラインを読み込み中..." 
                                        HorizontalAlignment="Center" 
@@ -226,7 +211,24 @@
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
-            </TabItem>
-        </TabControl>
+            </Border>
+            
+            <!-- タブヘッダー（下部） -->
+            <Border x:Name="tabBorder" Grid.Row="1" Background="#F0F0F0" BorderBrush="#8C8C8C" BorderThickness="1,1,1,1">
+                <StackPanel x:Name="tabContainer" Orientation="Horizontal" Height="22">
+                    <Border x:Name="tabMain" 
+                            Background="White" 
+                            BorderBrush="#8C8C8C" 
+                            BorderThickness="1,0,1,1" 
+                            Padding="8,2">
+                        <TextBlock Text="統合TL" 
+                                   FontSize="11" 
+                                   Foreground="Black" 
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <Border Background="#F0F0F0" Width="2"/>
+                </StackPanel>
+            </Border>
+        </Grid>
     </DockPanel>
 </Window>

@@ -56,7 +56,7 @@ namespace MiView.Common.AnalyzeData
                                    JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Name) +
                                    JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.CreatedAt);
             Container.PROTECTED = StringToProtectedStatus(Protected);
-            Container.ISLOCAL = bool.Parse(JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.LocalOnly));
+            Container.ISLOCAL = bool.TryParse(JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.LocalOnly), out bool isLocal) && isLocal;
             Container.RENOTED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.RenoteId) != string.Empty;
             Container.REPLAYED = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.ReplyId) != string.Empty;
             // Container.CW = JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CW) != string.Empty;

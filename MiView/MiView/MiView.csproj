@@ -25,13 +25,10 @@
 
   <ItemGroup>
     <Compile Remove="ScreenForms\**" />
-    <Compile Remove="Common\**" />
     <Compile Remove="Properties\**" />
     <EmbeddedResource Remove="ScreenForms\**" />
-    <EmbeddedResource Remove="Common\**" />
     <EmbeddedResource Remove="Properties\**" />
     <None Remove="ScreenForms\**" />
-    <None Remove="Common\**" />
     <None Remove="Properties\**" />
   </ItemGroup>
 
