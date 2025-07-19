@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Linux用（開発環境） -->
     <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
 
     <!-- Application Info -->
@@ -24,16 +25,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="ScreenForms\**" />
-    <Compile Remove="Properties\**" />
-    <EmbeddedResource Remove="ScreenForms\**" />
-    <EmbeddedResource Remove="Properties\**" />
-    <None Remove="ScreenForms\**" />
-    <None Remove="Properties\**" />
+    <!-- 除外設定を削除 -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Include="ScreenForms/PlainForm/MenuBarControl.axaml" />
+    <Page Include="ScreenForms/PlainForm/InstanceSelectorControl.axaml" />
+    <Page Include="ScreenForms/PlainForm/StatusBarControl.axaml" />
+    <Page Include="ScreenForms/PlainForm/DetailPanelControl.axaml" />
+    <Page Include="ScreenForms/PlainForm/TimelineControl.axaml" />
   </ItemGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="Common\Fonts\Material\MaterialIcons-Regular.ttf" />
+    <AvaloniaResource Include="Resources/Styles/Colors.xaml" />
+    <AvaloniaResource Include="Resources/Styles/Styles.xaml" />
   </ItemGroup>
 
 

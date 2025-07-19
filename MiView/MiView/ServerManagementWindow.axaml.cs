@@ -62,6 +62,10 @@ namespace MiView
                     // UI更新
                     _serverList.Remove(serverInfo);
                     _hasChanges = true;
+                    
+                    // 即座に設定を保存
+                    SaveSettings();
+                    Console.WriteLine($"Server deleted: {serverInfo.InstanceName}, total instances: {_instances.Count}");
                 }
             }
         }
@@ -81,6 +85,7 @@ namespace MiView
                     SaveSettings();
                     LoadServerList();
                     _hasChanges = true;
+                    Console.WriteLine($"Server edited: {serverInfo.InstanceName}, API key updated");
                 }
             }
         }
@@ -95,16 +100,18 @@ namespace MiView
             var result = await addWindow.ShowDialog<ServerEditResult?>(this);
             if (result?.Success == true && !string.IsNullOrEmpty(result.InstanceName))
             {
-                if (!_instances.Contains(result.InstanceName))
+                var normalizedUrl = NormalizeInstanceUrl(result.InstanceName);
+                if (!_instances.Contains(normalizedUrl))
                 {
-                    _instances.Add(result.InstanceName);
+                    _instances.Add(normalizedUrl);
                     if (!string.IsNullOrEmpty(result.ApiKey))
                     {
-                        _instanceTokens[result.InstanceName] = result.ApiKey;
+                        _instanceTokens[normalizedUrl] = result.ApiKey;
                     }
                     SaveSettings();
                     LoadServerList();
                     _hasChanges = true;
+                    Console.WriteLine($"Server added: {normalizedUrl}, total instances: {_instances.Count}");
                 }
             }
         }
@@ -120,16 +127,25 @@ namespace MiView
             {
                 if (File.Exists(SETTINGS_FILE))
                 {
-                    var jsonString = File.ReadAllText(SETTINGS_FILE);
-                    var settings = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString) ?? new();
+                    var json = File.ReadAllText(SETTINGS_FILE);
+                    var settings = JsonSerializer.Deserialize<AppSettings>(json);
                     
-                    var keyToRemove = $"instance_{instanceName}";
-                    if (settings.ContainsKey(keyToRemove))
+                    if (settings != null)
                     {
-                        settings.Remove(keyToRemove);
+                        // インスタンスリストから削除
+                        settings.Instances.Remove(instanceName);
+                        
+                        // APIキーからも削除
+                        if (settings.InstanceTokens.ContainsKey(instanceName))
+                        {
+                            settings.InstanceTokens.Remove(instanceName);
+                        }
+                        
+                        // 保存
+                        var updatedJson = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                        File.WriteAllText(SETTINGS_FILE, updatedJson);
+                        Console.WriteLine($"Removed {instanceName} from settings");
                     }
-                    
-                    File.WriteAllText(SETTINGS_FILE, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
                 }
             }
             catch (Exception ex)
@@ -142,30 +158,15 @@ namespace MiView
         {
             try
             {
-                var settings = new Dictionary<string, object>();
-                
-                // 既存設定を読み込み
-                if (File.Exists(SETTINGS_FILE))
+                var settings = new AppSettings
                 {
-                    var jsonString = File.ReadAllText(SETTINGS_FILE);
-                    settings = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString) ?? new();
-                }
+                    Instances = _instances.ToList(),
+                    InstanceTokens = _instanceTokens
+                };
                 
-                // インスタンス設定を更新
-                foreach (var instance in _instances)
-                {
-                    var key = $"instance_{instance}";
-                    if (_instanceTokens.ContainsKey(instance))
-                    {
-                        settings[key] = _instanceTokens[instance];
-                    }
-                    else
-                    {
-                        settings[key] = "";
-                    }
-                }
-                
-                File.WriteAllText(SETTINGS_FILE, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(SETTINGS_FILE, json);
+                Console.WriteLine($"Settings saved successfully: {_instances.Count} instances - {string.Join(", ", _instances)}");
             }
             catch (Exception ex)
             {
@@ -227,6 +228,29 @@ namespace MiView
             dialog.Content = panel;
             await dialog.ShowDialog(this);
             return result;
+        }
+        
+        private string NormalizeInstanceUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return url;
+                
+            var normalized = url.Trim();
+            
+            // プロトコルを除去
+            if (normalized.StartsWith("http://"))
+            {
+                normalized = normalized.Substring(7);
+            }
+            else if (normalized.StartsWith("https://"))
+            {
+                normalized = normalized.Substring(8);
+            }
+            
+            // 末尾のスラッシュを削除
+            normalized = normalized.TrimEnd('/');
+            
+            return normalized;
         }
     }
 

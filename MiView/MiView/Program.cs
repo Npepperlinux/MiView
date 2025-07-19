@@ -68,7 +68,7 @@ public static class Program
             using var ws = new ClientWebSocket();
             var wsUrl = $"wss://{instanceUrl}/streaming?i={apiKey}";
             
-            Console.WriteLine($"接続中: {wsUrl}");
+            Console.WriteLine($"接続中: wss://{instanceUrl}/streaming?i=[HIDDEN]");
             await ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
             
             if (ws.State == WebSocketState.Open)

@@ -68,6 +68,15 @@ namespace MiView.Common.Connection.WebSocket
         }
         = false;
 
+        /// <summary>
+        /// ユーザー操作による切断フラグ
+        /// </summary>
+        private bool _UserInitiatedDisconnect
+        {
+            get; set;
+        }
+        = false;
+
         protected object? _MainForm
         {
             get; set;
@@ -158,6 +167,22 @@ namespace MiView.Common.Connection.WebSocket
         }
 
         /// <summary>
+        /// ユーザー操作による切断を設定
+        /// </summary>
+        public void SetUserInitiatedDisconnect(bool isUserInitiated)
+        {
+            this._UserInitiatedDisconnect = isUserInitiated;
+        }
+
+        /// <summary>
+        /// ユーザー操作による切断かどうかを取得
+        /// </summary>
+        public bool IsUserInitiatedDisconnect()
+        {
+            return this._UserInitiatedDisconnect;
+        }
+
+        /// <summary>
         /// Get Socket
         /// </summary>
         /// <returns></returns>
@@ -203,20 +228,54 @@ namespace MiView.Common.Connection.WebSocket
                 _WebSocket = new ClientWebSocket();
             }
 
-            int TryCnt = 0;
+            int retryCount = 0;
+            const int maxRetries = 5;
+            const int retryDelaySeconds = 5;
+            
             while (!this._ConnectionClose)
             {
-                TryCnt++;
-
-                Thread.Sleep(1000);
-
-                if (_WebSocket.State != WebSocketState.Open)
+                try
                 {
-                    await CreateAndOpen(this._HostUrl);
+                    if (_WebSocket.State != WebSocketState.Open)
+                    {
+                        // ユーザー操作による切断でない場合のみ再接続
+                        if (!this._UserInitiatedDisconnect)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"WebSocket not open, attempting to connect. State: {_WebSocket.State}, Retry: {retryCount + 1}/{maxRetries}");
+                            
+                            await CreateAndOpen(this._HostUrl);
+                            retryCount = 0; // 成功したらリトライカウントをリセット
+                        }
+                        else
+                        {
+                            // ユーザー操作による切断の場合は終了
+                            System.Diagnostics.Debug.WriteLine("User initiated disconnect, stopping watcher");
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        // 接続が正常な場合はリトライカウントをリセット
+                        retryCount = 0;
+                    }
+                    
+                    // 接続状態をチェック
+                    await Task.Delay(TimeSpan.FromSeconds(10)); // 10秒間隔でチェック
                 }
-                if (TryCnt > 10)
+                catch (Exception ex)
                 {
-                    return;
+                    retryCount++;
+                    System.Diagnostics.Debug.WriteLine($"WebSocket watcher error (retry {retryCount}/{maxRetries}): {ex.Message}");
+                    
+                    if (retryCount >= maxRetries)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Max retries reached, stopping watcher for {this._HostUrl}");
+                        break;
+                    }
+                    
+                    // 指数バックオフで待機
+                    var delaySeconds = Math.Min(retryDelaySeconds * (int)Math.Pow(2, retryCount - 1), 60);
+                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
                 }
             }
         }
@@ -232,32 +291,65 @@ namespace MiView.Common.Connection.WebSocket
 
             if ((this._State == WebSocketState.Open))
             {
-                throw new InvalidOperationException("Socket is already opened");
+                System.Diagnostics.Debug.WriteLine("Socket is already opened, skipping connection");
+                return;
             }
 
             ClientWebSocket? WS = null;
             try
             {
-                WS = new ClientWebSocket();
-                //if (this._WebSocket != null)
-                //{
-                //    WS = this._WebSocket;
-                //}
-                WS.Options.KeepAliveInterval = TimeSpan.Zero;
+                // 既存のWebSocketをクリーンアップ
+                if (_WebSocket != null && _WebSocket.State != WebSocketState.Closed)
+                {
+                    try
+                    {
+                        await _WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Reconnecting", CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error closing existing WebSocket: {ex.Message}");
+                    }
+                }
 
-                await WS.ConnectAsync(new Uri(this._HostUrl), CancellationToken.None);
+                WS = new ClientWebSocket();
+                
+                // WebSocketオプションを設定
+                WS.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+                WS.Options.SetRequestHeader("User-Agent", "MiView/1.0");
+                
+                // 接続タイムアウトを90秒に延長
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+                
+                System.Diagnostics.Debug.WriteLine($"Attempting WebSocket connection to: {this._HostUrl}");
+                await WS.ConnectAsync(new Uri(this._HostUrl), cts.Token);
+
+                // 接続状態を確認
+                await Task.Delay(1000); // 1秒待機して状態を安定させる
 
                 if (WS.State != WebSocketState.Open)
                 {
-                    // throw new InvalidOperationException("connection is not opened.");
+                    System.Diagnostics.Debug.WriteLine($"WebSocket connection failed. State: {WS.State}");
+                    throw new InvalidOperationException($"WebSocket connection failed. State: {WS.State}");
                 }
 
+                System.Diagnostics.Debug.WriteLine($"WebSocket connection successful to: {this._HostUrl}");
                 this._WebSocket = WS;
                 this._State = WS.State;
             }
+            catch (OperationCanceledException)
+            {
+                System.Diagnostics.Debug.WriteLine($"WebSocket connection timeout for {this._HostUrl}");
+                throw;
+            }
+            catch (WebSocketException wsEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"WebSocket connection error for {this._HostUrl}: {wsEx.Message}");
+                throw;
+            }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"WebSocket operation error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"WebSocket operation error for {this._HostUrl}: {ex.Message}");
+                throw;
             }
         }
 

@@ -1,0 +1,14 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MiView.ScreenForms.PlainForm.StatusBarControl">
+    <Border Background="#F0F0F0" BorderBrush="#8C8C8C" BorderThickness="0,1,0,0">
+        <Grid Height="25">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="tsLabelMain" Grid.Column="0" Text="タブ件数：" Margin="5,0" VerticalAlignment="Center" Foreground="#000000" Background="Transparent" />
+            <TextBlock x:Name="tsLabelNoteCount" Grid.Column="1" Text="9999/9999" Margin="5,0" VerticalAlignment="Center" Foreground="#000000" Background="Transparent" />
+        </Grid>
+    </Border>
+</UserControl> 

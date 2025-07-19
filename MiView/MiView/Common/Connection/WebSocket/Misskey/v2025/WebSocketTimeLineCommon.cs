@@ -72,47 +72,89 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
         /// <exception cref="InvalidOperationException"></exception>
         public WebSocketTimeLineCommon OpenTimeLine(string InstanceURL, string? ApiKey)
         {
-            // タイムライン用WebSocket Open
-            this.Start(this.GetWSURL(InstanceURL, ApiKey));
-            if (this.GetSocketClient() == null || this._WebSocketConnectionObj == null)
+            try
             {
-                throw new InvalidOperationException("connection is not opened.");
-            }
-
-            int RetryCnt = 0;
-            while (this.IsStandBySocketOpen())
-            {
-                Thread.Sleep(1000);
-                RetryCnt++;
-                if (RetryCnt > 10)
+                // タイムライン用WebSocket Open
+                var wsUrl = this.GetWSURL(InstanceURL, ApiKey);
+                System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Attempting to connect to: {wsUrl}");
+                System.Diagnostics.Debug.WriteLine($"OpenTimeLine: InstanceURL={InstanceURL}, ApiKey provided={!string.IsNullOrEmpty(ApiKey)}");
+                
+                this.Start(wsUrl);
+                
+                // 接続完了を待つ（タイムアウト付き）
+                int RetryCnt = 0;
+                const int maxRetries = 15; // タイムアウトを15秒に延長
+                
+                while (this.GetSocketState() != WebSocketState.Open && RetryCnt < maxRetries)
                 {
-                    if (this.GetSocketState() != WebSocketState.Open)
+                    Thread.Sleep(1000);
+                    RetryCnt++;
+                    System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Connection attempt {RetryCnt}/{maxRetries}, State: {this.GetSocketState()}");
+                    
+                    if (RetryCnt >= maxRetries)
                     {
-                        this.OnConnectionLost(this, new EventArgs());
+                        if (this.GetSocketState() != WebSocketState.Open)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Connection failed after {maxRetries} attempts. Final state: {this.GetSocketState()}");
+                            this.OnConnectionLost(this, new EventArgs());
+                            throw new InvalidOperationException($"WebSocket connection failed to open after {maxRetries} seconds");
+                        }
                     }
                 }
+                
+                System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Connection check - SocketClient: {this.GetSocketClient() != null}, WebSocketConnectionObj: {this._WebSocketConnectionObj != null}");
+                if (this.GetSocketClient() == null || this._WebSocketConnectionObj == null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Connection objects are null - SocketClient: {this.GetSocketClient()}, WebSocketConnectionObj: {this._WebSocketConnectionObj}");
+                    throw new InvalidOperationException("connection is not opened.");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"OpenTimeLine error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"OpenTimeLine error details: {ex}");
+                throw;
             }
 
             // チャンネル接続用
+            System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Creating connection message");
             ConnectMain SendObj = new ConnectMain();
             ConnectMainBody SendBody = this._WebSocketConnectionObj;
             SendObj.type = "connect";
             SendObj.body = SendBody;
+            System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Connection message created - type: {SendObj.type}, channel: {SendBody?.channel}");
 
             var SendBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(SendObj));
             var Buffers = new ArraySegment<byte>(SendBytes);
+            System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Message serialized, length: {SendBytes.Length}");
 
             // ソケットのステータスを一旦リセットする(同じソケット使うので)
             this.SetSocketState(WebSocketState.None);
+            System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Sending connection message");
             Task.Run(async () =>
             {
-                // 本チャンのwebsocket接続
-                await this.GetSocketClient().SendAsync(Buffers, WebSocketMessageType.Text, true, CancellationToken.None);
+                try
+                {
+                    // 本チャンのwebsocket接続
+                    await this.GetSocketClient().SendAsync(Buffers, WebSocketMessageType.Text, true, CancellationToken.None);
+                    System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Connection message sent successfully");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Error sending connection message: {ex.Message}");
+                }
             });
-            while (this.IsStandBySocketOpen())
+            
+            // 送信完了を待つ（タイムアウト付き）
+            int retryCount = 0;
+            while (this.IsStandBySocketOpen() && retryCount < 5)
             {
+                Thread.Sleep(1000);
+                retryCount++;
+                System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Waiting for send completion, attempt {retryCount}/5");
             }
 
+            System.Diagnostics.Debug.WriteLine($"OpenTimeLine: Connection setup completed");
             return this;
         }
 
@@ -125,27 +167,51 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
         /// <exception cref="InvalidOperationException"></exception>
         public WebSocketTimeLineCommon OpenTimeLineDynamic(string InstanceURL, string ApiKey)
         {
-            // WS取得
-            WebSocketTimeLineCommon WSTimeLine = WebSocketTimeLineCommon.CreateInstance(this._TLKind);
-
-            // タイムライン用WebSocket Open
-            this.Start(WSTimeLine.GetWSURL(InstanceURL, ApiKey));
-            if (this.GetSocketClient() == null || this._WebSocketConnectionObj == null)
+            try
             {
-                throw new InvalidOperationException("connection is not opened.");
-            }
-            int RetryCnt = 0;
-            while (WSTimeLine.IsStandBySocketOpen())
-            {
-                Thread.Sleep(1000);
-                RetryCnt++;
-                if (RetryCnt > 10)
+                // WS取得
+                WebSocketTimeLineCommon? WSTimeLine = WebSocketTimeLineCommon.CreateInstance(this._TLKind);
+                if (WSTimeLine == null)
                 {
-                    if (WSTimeLine.GetSocketState() != WebSocketState.Open)
+                    throw new InvalidOperationException("Failed to create WebSocket timeline instance");
+                }
+
+                // タイムライン用WebSocket Open
+                var wsUrl = WSTimeLine.GetWSURL(InstanceURL, ApiKey);
+                System.Diagnostics.Debug.WriteLine($"Attempting to connect to: {wsUrl}");
+                
+                this.Start(wsUrl);
+                
+                if (this.GetSocketClient() == null || this._WebSocketConnectionObj == null)
+                {
+                    throw new InvalidOperationException("connection is not opened.");
+                }
+                
+                // 接続完了を待つ（タイムアウト付き）
+                int RetryCnt = 0;
+                const int maxRetries = 15; // タイムアウトを15秒に延長
+                
+                while (WSTimeLine.GetSocketState() != WebSocketState.Open && RetryCnt < maxRetries)
+                {
+                    Thread.Sleep(1000);
+                    RetryCnt++;
+                    System.Diagnostics.Debug.WriteLine($"Connection attempt {RetryCnt}/{maxRetries}, State: {WSTimeLine.GetSocketState()}");
+                    
+                    if (RetryCnt >= maxRetries)
                     {
-                        WSTimeLine.OnConnectionLost(WSTimeLine, new EventArgs());
+                        if (WSTimeLine.GetSocketState() != WebSocketState.Open)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Connection failed after {maxRetries} attempts. Final state: {WSTimeLine.GetSocketState()}");
+                            WSTimeLine.OnConnectionLost(WSTimeLine, new EventArgs());
+                            throw new InvalidOperationException($"WebSocket connection failed to open after {maxRetries} seconds");
+                        }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"OpenTimeLineDynamic error: {ex.Message}");
+                throw;
             }
 
             // チャンネル接続用
@@ -164,8 +230,13 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
                 // 本チャンのwebsocket接続
                 await this.GetSocketClient().SendAsync(Buffers, WebSocketMessageType.Text, true, CancellationToken.None);
             });
-            while (this.IsStandBySocketOpen())
+            
+            // 送信完了を待つ（タイムアウト付き）
+            int retryCount = 0;
+            while (this.IsStandBySocketOpen() && retryCount < 5)
             {
+                Thread.Sleep(1000);
+                retryCount++;
             }
 
             return this;
@@ -257,29 +328,58 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
             {
                 return;
             }
+
+            // ユーザー操作による切断でない場合のみ再接続
+            if (this.IsUserInitiatedDisconnect())
+            {
+                System.Diagnostics.Debug.WriteLine("ユーザー操作による切断のため、再接続しません");
+                return;
+            }
+
             // オープンを待つ
             WebSocketTimeLineCommon WS = (WebSocketTimeLineCommon)sender;
-            while (WS.GetSocketState() != WebSocketState.Open)
+            int retryCount = 0;
+            const int maxRetries = 10;
+            
+            while (WS.GetSocketState() != WebSocketState.Open && retryCount < maxRetries)
             {
-                // 1分おき
-                Thread.Sleep(1000 * 60 * 1);
-                System.Diagnostics.Debug.WriteLine("待機中（　＾ω＾）");
+                retryCount++;
+                // 指数バックオフで再接続間隔を調整（1分、2分、4分...）
+                int waitSeconds = Math.Min(60 * (int)Math.Pow(2, retryCount - 1), 300); // 最大5分
+                Thread.Sleep(1000 * waitSeconds);
+                System.Diagnostics.Debug.WriteLine($"再接続試行 {retryCount}/{maxRetries} - 待機中（　＾ω＾）");
                 try
                 {
-                    WS.OpenTimeLineDynamic(this._HostDefinition, this._APIKey);
+                    if (this._APIKey != null)
+                    {
+                        WS.OpenTimeLineDynamic(this._HostDefinition, this._APIKey);
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("API key is null, cannot reconnect");
+                    }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"再接続失敗: {ex.Message}");
                 }
                 System.Diagnostics.Debug.WriteLine("現在の状態：" + ((WebSocketTimeLineCommon)sender).GetSocketClient().State);
             }
+            
             if (WS == null)
             {
                 // 必ず入ってるはず
                 return;
             }
 
-            ReadTimeLineContinuous(WS);
+            if (WS.GetSocketState() == WebSocketState.Open)
+            {
+                ReadTimeLineContinuous(WS);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("最大再接続回数に達しました");
+            }
         }
 
         protected override void OnDataReceived(object? sender, ConnectDataReceivedEventArgs e)

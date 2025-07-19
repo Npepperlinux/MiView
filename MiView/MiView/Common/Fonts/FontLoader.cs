@@ -13,7 +13,7 @@ namespace MiView.Common.Fonts
         /// <summary>
         /// フォント格納先基準ディレクトリ
         /// </summary>
-        private const string _FontDirectory = @"./Common/Fonts";
+        private const string _FontDirectory = @"Common/Fonts";
 
         private const string _Font_Prefix = "_Font_";
 
@@ -61,20 +61,12 @@ namespace MiView.Common.Fonts
             }
 
             // Avalonia用のフォント読み込み
-            var fontPath = _FontDirectory + _FontPair[Selector];
+            var fontPath = _FontPair[Selector];
             
             try
             {
-                // ファイルが存在する場合はカスタムフォントを使用
-                if (System.IO.File.Exists(fontPath))
-                {
-                    return new FontFamily($"avares://MiView{fontPath}");
-                }
-                else
-                {
-                    // フォントファイルが見つからない場合はデフォルトフォントを返す
-                    return FontFamily.Default;
-                }
+                // Avaloniaのリソースからフォントを読み込む
+                return new FontFamily("avares://MiView/Common/Fonts/Material/MaterialIcons-Regular.ttf#Material Icons");
             }
             catch
             {

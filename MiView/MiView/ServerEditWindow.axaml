@@ -6,6 +6,12 @@
         Height="250"
         WindowStartupLocation="CenterOwner"
         Background="#F0F0F0">
+    <Window.Styles>
+        <Style Selector="TextBox">
+            <Setter Property="SelectionBrush" Value="#86b300" />
+            <Setter Property="SelectionForegroundBrush" Value="White" />
+        </Style>
+    </Window.Styles>
     
     <Grid Margin="20" Background="Transparent">
         <Grid.RowDefinitions>
