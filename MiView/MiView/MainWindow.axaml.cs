@@ -16,6 +16,8 @@ using MiView.Common.TimeLine;
 using MiView.Common.AnalyzeData.Format;
 using MiView.Common.Connection.WebSocket.Misskey.v2025;
 using MiView.Common.AnalyzeData;
+using MiView.Common.Fonts;
+using MiView.Common.Fonts.Material;
 
 namespace MiView
 {
@@ -24,6 +26,7 @@ namespace MiView
         private ClientWebSocket? _webSocket;
         private CancellationTokenSource? _cancellationTokenSource;
         private ObservableCollection<string> _instances = new();
+        private ObservableCollection<TimeLineContainer> _timelineData = new();
         private Dictionary<string, List<string>> _serverTabs = new();
         private Dictionary<string, string> _instanceTokens = new();
         private const string SETTINGS_FILE = "settings.json";
@@ -32,8 +35,16 @@ namespace MiView
         private List<TimeLineContainer> _timelineItems = new();
         private WebSocketTimeLineCommon? _webSocketTimeLine;
         private Dictionary<string, List<TimeLineContainer>> _timelineCache = new();
+        private Dictionary<string, Dictionary<string, List<TimeLineContainer>>> _timelineCacheByType = new(); // インスタンス別 → タイムライン種別 → データ
         private const int MAX_CACHED_ITEMS = 1000;
         private List<WebSocketTimeLineCommon> _unifiedTimelineConnections = new();
+        private FontLoader _fontLoader = new();
+        
+        // 常時接続用WebSocket管理
+        private Dictionary<string, Dictionary<string, WebSocketTimeLineCommon>> _persistentConnections = new(); // インスタンス → タイムライン種別 → WebSocket
+        private Timer? _reconnectTimer;
+        private bool _isConnected = false;
+        private CancellationTokenSource? _tabSwitchCancellation;
 
         public MainWindow()
         {
@@ -47,8 +58,9 @@ namespace MiView
             cmbInstanceSelect.ItemsSource = _instances;
             cmbInstanceSelect.SelectionChanged += OnInstanceSelectionChanged;
             
+            
             // 初期メッセージ
-            tsLabelMain.Text = "インスタンスを選択して「接続」ボタンを押してください";
+            tsLabelMain.Text = "MiView - 起動中...";
             tsLabelNoteCount.Text = "0/0";
             
             // 設定を読み込み
@@ -56,6 +68,26 @@ namespace MiView
             
             // テスト用の投稿を追加
             AddTestTimelineItems();
+            
+            // 常時接続を開始
+            StartPersistentConnections();
+            
+            // 再接続タイマーを開始
+            StartReconnectTimer();
+            
+            // 起動時に接続状態を設定
+            Task.Delay(3000).ContinueWith(_ => 
+            {
+                Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (_instances.Count > 0)
+                    {
+                        _isConnected = true;
+                        cmdConnect.Content = "切断";
+                        tsLabelMain.Text = $"準備完了";
+                    }
+                });
+            });
         }
 
         private void AddTestTimelineItems()
@@ -91,6 +123,17 @@ namespace MiView
                 };
                 
                 AddTimelineItem(timelineItem, instance);
+                
+                // サンプルデータもキャッシュに追加
+                var cacheKey = GetCacheKey(instance, _selectedTabIndex);
+                if (!_timelineCache.ContainsKey(cacheKey))
+                {
+                    _timelineCache[cacheKey] = new List<TimeLineContainer>();
+                }
+                _timelineCache[cacheKey].Insert(0, timelineItem);
+                
+                // ObservableCollectionにも追加
+                _timelineData.Insert(0, timelineItem);
             }
             
         }
@@ -100,9 +143,17 @@ namespace MiView
             // TimeLineContainerからNoteオブジェクトを作成
             var note = new Note { Node = timelineItem.ORIGINAL };
             
-            // 交互の行色を決定
-            var isEvenRow = (_noteCount % 2 == 0);
-            var backgroundColor = isEvenRow ? Avalonia.Media.Brushes.White : Avalonia.Media.Brush.Parse("#F5F5F5");
+            // 背景色を決定（Renote、交互の行色）
+            Avalonia.Media.IBrush backgroundColor;
+            if (timelineItem.RENOTED)
+            {
+                backgroundColor = Avalonia.Media.Brush.Parse("#E8F5E8"); // 薄緑色（Renote）
+            }
+            else
+            {
+                var isEvenRow = (_noteCount % 2 == 0);
+                backgroundColor = isEvenRow ? Avalonia.Media.Brushes.White : Avalonia.Media.Brush.Parse("#F5F5F5");
+            }
             
             var timelineGrid = new Grid
             {
@@ -123,7 +174,14 @@ namespace MiView
             // ホバー効果を追加
             timelineGrid.PointerEntered += (sender, e) =>
             {
-                timelineGrid.Background = Avalonia.Media.Brush.Parse("#E8F4FD");
+                if (timelineItem.RENOTED)
+                {
+                    timelineGrid.Background = Avalonia.Media.Brush.Parse("#D4F4D4"); // 濃い緑色（Renoteホバー）
+                }
+                else
+                {
+                    timelineGrid.Background = Avalonia.Media.Brush.Parse("#E8F4FD"); // 青色（通常ホバー）
+                }
             };
             
             timelineGrid.PointerExited += (sender, e) =>
@@ -136,6 +194,7 @@ namespace MiView
             {
                 var border = new Border
                 {
+                    Background = Avalonia.Media.Brushes.Transparent,
                     BorderBrush = Avalonia.Media.Brush.Parse("#8C8C8C"),
                     BorderThickness = new Avalonia.Thickness(0, 0, i < 5 ? 1 : 0, 1),
                     [Grid.ColumnProperty] = i
@@ -149,6 +208,9 @@ namespace MiView
                     Margin = new Avalonia.Thickness(2, 0),
                     TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis
                 };
+                
+                // MaterialIconsフォントを取得
+                var materialIconFont = _fontLoader.LoadFontFamilyFromFile(FontLoader.FONT_SELECTOR.MATERIALICONS);
 
                 switch (i)
                 {
@@ -156,39 +218,52 @@ namespace MiView
                         // Status icon based on timeline item properties
                         if (timelineItem.RENOTED)
                         {
-                            textBlock.Text = "🔄";
-                            textBlock.Foreground = Avalonia.Media.Brushes.Green;
+                            textBlock.Text = MaterialIcons.Repeat;
+                            textBlock.FontFamily = materialIconFont;
+                            textBlock.Foreground = Avalonia.Media.Brush.Parse("#4CAF50");
                         }
                         else if (timelineItem.REPLAYED)
                         {
-                            textBlock.Text = "💬";
+                            textBlock.Text = MaterialIcons.Reply;
+                            textBlock.FontFamily = materialIconFont;
+                            textBlock.Foreground = Avalonia.Media.Brush.Parse("#2196F3");
                         }
                         else
                         {
-                            textBlock.Text = "🟢";
+                            textBlock.Text = MaterialIcons.Circle;
+                            textBlock.FontFamily = materialIconFont;
+                            textBlock.Foreground = Avalonia.Media.Brush.Parse("#9E9E9E");
                         }
-                        textBlock.FontSize = 8;
+                        textBlock.FontSize = 14;
                         textBlock.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
                         break;
                     case 1:
-                        // Protection status icon
-                        textBlock.Text = timelineItem.PROTECTED switch
-                        {
-                            TimeLineContainer.PROTECTED_STATUS.Direct => "🔒",
-                            TimeLineContainer.PROTECTED_STATUS.Follower => "👥",
-                            TimeLineContainer.PROTECTED_STATUS.Home => "🏠",
-                            _ => "🔵"
-                        };
-                        textBlock.FontSize = 8;
+                        // Federation status icon (宇宙船マーク)
+                        textBlock.Text = MaterialIcons.Rocket;
+                        textBlock.FontFamily = materialIconFont;
+                        textBlock.FontSize = 14;
                         textBlock.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+                        
+                        // 連合しているかどうかで色を変更（SOURCEが現在のインスタンスと異なれば連合）
+                        var currentInstance = GetCurrentInstanceUrl();
+                        if (!string.IsNullOrEmpty(timelineItem.SOURCE) && timelineItem.SOURCE != currentInstance)
+                        {
+                            textBlock.Foreground = Avalonia.Media.Brush.Parse("#4CAF50"); // 緑（連合）
+                        }
+                        else
+                        {
+                            textBlock.Foreground = Avalonia.Media.Brush.Parse("#F44336"); // 赤（非連合）
+                        }
                         break;
                     case 2:
                         textBlock.Text = timelineItem.USERNAME;
                         textBlock.FontWeight = Avalonia.Media.FontWeight.Bold;
+                        textBlock.Foreground = Avalonia.Media.Brush.Parse("#000000");
                         break;
                     case 3:
                         textBlock.Text = timelineItem.DETAIL;
                         textBlock.TextWrapping = Avalonia.Media.TextWrapping.Wrap;
+                        textBlock.Foreground = Avalonia.Media.Brush.Parse("#000000");
                         break;
                     case 4:
                         textBlock.Text = timelineItem.UPDATEDAT;
@@ -222,6 +297,7 @@ namespace MiView
             _noteCount++;
             tsLabelNoteCount.Text = $"{_noteCount}/9999";
         }
+        
 
         private Button CreateActionButton(string emoji, string action)
         {
@@ -258,13 +334,29 @@ namespace MiView
 
         private async void cmdConnect_Click(object? sender, RoutedEventArgs e)
         {
+#if DEBUG
             Console.WriteLine("Connect button clicked!");
+#endif
             var instanceUrl = cmbInstanceSelect.SelectedItem?.ToString()?.Trim();
+#if DEBUG
             Console.WriteLine($"Selected instance: {instanceUrl}");
+#endif
+            
+            if (_isConnected)
+            {
+                // 切断処理
+                await DisconnectWebSocket();
+                cmdConnect.Content = "接続";
+                _isConnected = false;
+                tsLabelMain.Text = "切断しました";
+                return;
+            }
             
             if (string.IsNullOrEmpty(instanceUrl))
             {
+#if DEBUG
                 Console.WriteLine("No instance selected, showing add dialog");
+#endif
                 // 新しいインスタンスを追加するためのダイアログを表示
                 await ShowAddInstanceDialog();
                 return;
@@ -272,7 +364,9 @@ namespace MiView
             
             // 既存のインスタンスの場合は接続
             var apiKey = _instanceTokens.ContainsKey(instanceUrl) ? _instanceTokens[instanceUrl] : null;
+#if DEBUG
             Console.WriteLine($"Connecting to {instanceUrl} with API key: {(apiKey != null ? "Yes" : "No")}");
+#endif
             await ConnectToTimeline(instanceUrl, apiKey);
         }
 
@@ -283,25 +377,43 @@ namespace MiView
         
         private async Task ShowAddInstanceDialog()
         {
-            var urlTextBox = new TextBox { Name = "urlTextBox", Watermark = "mi.ruruke.moe", Margin = new Avalonia.Thickness(0, 0, 0, 10) };
-            var apiKeyTextBox = new TextBox { Name = "apiKeyTextBox", Watermark = "APIキー（オプション）", Margin = new Avalonia.Thickness(0, 0, 0, 10) };
+            var urlTextBox = new TextBox { 
+                Name = "urlTextBox", 
+                Watermark = "mi.ruruke.moe", 
+                Margin = new Avalonia.Thickness(0, 0, 0, 10),
+                Background = Avalonia.Media.Brush.Parse("#FFFFFF"),
+                Foreground = Avalonia.Media.Brush.Parse("#000000"),
+                BorderBrush = Avalonia.Media.Brush.Parse("#8C8C8C"),
+                BorderThickness = new Avalonia.Thickness(1)
+            };
+            var apiKeyTextBox = new TextBox { 
+                Name = "apiKeyTextBox", 
+                Watermark = "APIキー（オプション）", 
+                Margin = new Avalonia.Thickness(0, 0, 0, 10),
+                Background = Avalonia.Media.Brush.Parse("#FFFFFF"),
+                Foreground = Avalonia.Media.Brush.Parse("#000000"),
+                BorderBrush = Avalonia.Media.Brush.Parse("#8C8C8C"),
+                BorderThickness = new Avalonia.Thickness(1)
+            };
             
             var cancelButton = new Button 
             { 
                 Content = "キャンセル", 
                 Margin = new Avalonia.Thickness(0, 0, 10, 0),
-                Background = Avalonia.Media.Brushes.White,
+                Background = Avalonia.Media.Brush.Parse("#FFFFFF"),
                 BorderBrush = Avalonia.Media.Brush.Parse("#8C8C8C"),
                 BorderThickness = new Avalonia.Thickness(1),
-                Foreground = Avalonia.Media.Brushes.Black
+                Foreground = Avalonia.Media.Brush.Parse("#000000"),
+                Padding = new Avalonia.Thickness(15, 5)
             };
             var addButton = new Button 
             { 
                 Content = "追加",
-                Background = Avalonia.Media.Brushes.White,
+                Background = Avalonia.Media.Brush.Parse("#FFFFFF"),
                 BorderBrush = Avalonia.Media.Brush.Parse("#8C8C8C"),
                 BorderThickness = new Avalonia.Thickness(1),
-                Foreground = Avalonia.Media.Brushes.Black
+                Foreground = Avalonia.Media.Brush.Parse("#000000"),
+                Padding = new Avalonia.Thickness(15, 5)
             };
             
             var dialog = new Avalonia.Controls.Window
@@ -312,20 +424,32 @@ namespace MiView
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 CanResize = false,
                 ShowInTaskbar = false,
-                Background = Avalonia.Media.Brushes.White,
+                Background = Avalonia.Media.Brush.Parse("#F0F0F0"),
                 Content = new StackPanel
                 {
                     Margin = new Avalonia.Thickness(20),
+                    Background = Avalonia.Media.Brushes.Transparent,
                     Children =
                     {
-                        new TextBlock { Text = "インスタンスURL:", Margin = new Avalonia.Thickness(0, 0, 0, 5), Foreground = Avalonia.Media.Brushes.Black },
+                        new TextBlock { 
+                            Text = "インスタンスURL:", 
+                            Margin = new Avalonia.Thickness(0, 0, 0, 5), 
+                            Foreground = Avalonia.Media.Brush.Parse("#000000"),
+                            Background = Avalonia.Media.Brushes.Transparent
+                        },
                         urlTextBox,
-                        new TextBlock { Text = "APIキー（オプション）:", Margin = new Avalonia.Thickness(0, 0, 0, 5), Foreground = Avalonia.Media.Brushes.Black },
+                        new TextBlock { 
+                            Text = "APIキー（オプション）:", 
+                            Margin = new Avalonia.Thickness(0, 0, 0, 5), 
+                            Foreground = Avalonia.Media.Brush.Parse("#000000"),
+                            Background = Avalonia.Media.Brushes.Transparent
+                        },
                         apiKeyTextBox,
                         new StackPanel
                         {
                             Orientation = Avalonia.Layout.Orientation.Horizontal,
                             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                            Background = Avalonia.Media.Brushes.Transparent,
                             Children =
                             {
                                 cancelButton,
@@ -418,23 +542,31 @@ namespace MiView
         {
             try
             {
+#if DEBUG
                 Console.WriteLine($"ConnectToTimeline called for {instanceUrl}");
+#endif
                 tsLabelMain.Text = "接続中...";
                 
                 // 既存の接続を切断
                 await DisconnectWebSocket();
                 
+#if DEBUG
                 Console.WriteLine($"Selected tab index: {_selectedTabIndex}");
+#endif
                 
                 // 統合TLの場合は複数のタイムラインに接続
                 if (_selectedTabIndex == 0) // 統合TL
                 {
+#if DEBUG
                     Console.WriteLine("Connecting to unified timeline");
+#endif
                     _ = Task.Run(async () => await ConnectToUnifiedTimeline(instanceUrl, apiKey));
                 }
                 else
                 {
+#if DEBUG
                     Console.WriteLine("Connecting to single timeline");
+#endif
                     // 通常の単一タイムライン接続をバックグラウンドで実行
                     _ = Task.Run(async () =>
                     {
@@ -461,18 +593,26 @@ namespace MiView
                                     try
                                     {
                                         System.Diagnostics.Debug.WriteLine($"Single timeline connecting to {instanceUrl}...");
+#if DEBUG
                                         Console.WriteLine($"Single timeline connecting to {instanceUrl}...");
+#endif
                                         _webSocketTimeLine.OpenTimeLine(instanceUrl, apiKey);
                                         System.Diagnostics.Debug.WriteLine($"Single timeline connected to {instanceUrl}, starting continuous read...");
+#if DEBUG
                                         Console.WriteLine($"Single timeline connected to {instanceUrl}, starting continuous read...");
+#endif
                                         WebSocketTimeLineCommon.ReadTimeLineContinuous(_webSocketTimeLine);
                                         System.Diagnostics.Debug.WriteLine($"Single timeline continuous read started for {instanceUrl}");
+#if DEBUG
                                         Console.WriteLine($"Single timeline continuous read started for {instanceUrl}");
+#endif
                                     }
                                     catch (Exception ex)
                                     {
                                         System.Diagnostics.Debug.WriteLine($"Single timeline error connecting to {instanceUrl}: {ex.Message}");
+#if DEBUG
                                         Console.WriteLine($"Single timeline error connecting to {instanceUrl}: {ex.Message}");
+#endif
                                         throw;
                                     }
                                 });
@@ -480,6 +620,8 @@ namespace MiView
                                 await Dispatcher.UIThread.InvokeAsync(() =>
                                 {
                                     tsLabelMain.Text = $"接続成功: {instanceUrl}";
+                                    cmdConnect.Content = "切断";
+                                    _isConnected = true;
                                 });
                             }
                             else
@@ -510,74 +652,27 @@ namespace MiView
         {
             try
             {
+#if DEBUG
                 Console.WriteLine("ConnectToUnifiedTimeline started");
+#endif
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    tsLabelMain.Text = "統合TL接続中...";
+                    tsLabelMain.Text = "統合TL接続中...（持続接続のソーシャルTLを使用）";
                 });
                 
-                // 統合TLでは全てのインスタンスのローカルTLに接続
+                // 統合TLは持続接続で既に確立されたソーシャルTL接続を使用
                 var connectedInstances = new List<WebSocketTimeLineCommon>();
-                
-                Console.WriteLine($"Found {_instances.Count} instances to connect to");
                 
                 foreach (var instance in _instances)
                 {
-                    try
+                    if (_persistentConnections.ContainsKey(instance) && 
+                        _persistentConnections[instance].ContainsKey("ソーシャルTL"))
                     {
-                        Console.WriteLine($"Creating timeline for {instance}");
-                        var localTimeline = WebSocketTimeLineCommon.CreateInstance(WebSocketTimeLineCommon.ConnectTimeLineKind.Local);
-                        if (localTimeline != null)
-                        {
-                            Console.WriteLine($"Timeline created for {instance}, adding event handler");
-                            localTimeline.TimeLineDataReceived += OnTimeLineDataReceived;
-                            
-                            var instanceApiKey = _instanceTokens.ContainsKey(instance) ? _instanceTokens[instance] : null;
-                            Console.WriteLine($"API key for {instance}: {(instanceApiKey != null ? "Yes" : "No")}");
-                            
-                            // 接続処理を非同期で実行（タイムアウト付き）
-                            try
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Connecting to {instance}...");
-                                Console.WriteLine($"Connecting to {instance}...");
-                                
-                                // タイムアウト付きで接続を試行
-                                await Task.Run(() =>
-                                {
-                                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                                    try
-                                    {
-                                        localTimeline.OpenTimeLine(instance, instanceApiKey);
-                                        Console.WriteLine($"Connected to {instance}, starting continuous read...");
-                                        WebSocketTimeLineCommon.ReadTimeLineContinuous(localTimeline);
-                                        Console.WriteLine($"Continuous read started for {instance}");
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"Error in OpenTimeLine for {instance}: {ex.Message}");
-                                        throw;
-                                    }
-                                });
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Error connecting to {instance}: {ex.Message}");
-                                Console.WriteLine($"Error connecting to {instance}: {ex.Message}");
-                                continue; // 他のインスタンスの接続を続行
-                            }
-                            
-                            connectedInstances.Add(localTimeline);
-                            
-                            // 進捗を更新
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                            {
-                                tsLabelMain.Text = $"統合TL接続中... ({connectedInstances.Count}/{_instances.Count})";
-                            });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Failed to connect to {instance}: {ex.Message}");
+                        var socialConnection = _persistentConnections[instance]["ソーシャルTL"];
+                        connectedInstances.Add(socialConnection);
+#if DEBUG
+                        Console.WriteLine($"Using existing persistent Social TL connection for {instance}");
+#endif
                     }
                 }
                 
@@ -590,10 +685,12 @@ namespace MiView
                     if (connectedInstances.Count > 0)
                     {
                         tsLabelMain.Text = $"統合TL接続成功: {connectedInstances.Count}個のインスタンス";
+                        cmdConnect.Content = "切断";
+                        _isConnected = true;
                     }
                     else
                     {
-                        tsLabelMain.Text = "統合TL接続失敗: 接続できるインスタンスがありません";
+                        tsLabelMain.Text = "統合TL接続失敗: 持続接続がまだ確立されていません";
                     }
                 });
             }
@@ -610,13 +707,40 @@ namespace MiView
         private async void OnTimeLineDataReceived(object? sender, TimeLineContainer container)
         {
             System.Diagnostics.Debug.WriteLine($"Timeline data received from {container.SOURCE}: {container.DETAIL}");
+#if DEBUG
             Console.WriteLine($"Timeline data received from {container.SOURCE}: {container.DETAIL}");
+#endif
             
             // UIスレッドで投稿を追加
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 // キャッシュキーを生成（インスタンス名_タブ名）
-                var cacheKey = GetCacheKey(container.SOURCE, _selectedTabIndex);
+                var instanceName = string.IsNullOrEmpty(container.SOURCE) ? GetCurrentInstanceUrl() : container.SOURCE;
+                
+                // 統合TL接続中の場合は、常にタブインデックス0として処理
+                var effectiveTabIndex = _selectedTabIndex;
+#if DEBUG
+                Console.WriteLine($"Current _selectedTabIndex: {_selectedTabIndex}, unified connections count: {_unifiedTimelineConnections.Count}");
+#endif
+                if (_unifiedTimelineConnections.Count > 0) // 統合TL接続中
+                {
+                    effectiveTabIndex = 0;
+#if DEBUG
+                    Console.WriteLine($"Using effectiveTabIndex=0 for unified timeline");
+#endif
+                }
+                
+                var cacheKey = GetCacheKey(instanceName, effectiveTabIndex);
+                
+                // タイムライン種別ごとの保存を追加（統合TLの場合はソーシャルTLとして保存）
+                SaveToTimelineCacheByType(instanceName, container, effectiveTabIndex);
+                
+                // ソーシャルTLデータの場合は統合TL用にも保存（統合TLで表示するため）
+                if (effectiveTabIndex == 0 && _unifiedTimelineConnections.Count > 0) // 統合TL接続中のソーシャルTLデータ
+                {
+                    // ソーシャルTLタブ（インデックス2）用にも保存（重複チェック付き）
+                    SaveToTimelineCacheByTypeIfNotExists(instanceName, container, 2);
+                }
                 
                 // キャッシュに追加
                 if (!_timelineCache.ContainsKey(cacheKey))
@@ -632,24 +756,157 @@ namespace MiView
                     _timelineCache[cacheKey].RemoveAt(_timelineCache[cacheKey].Count - 1);
                 }
                 
-                // 現在表示中のタブと一致する場合のみUI更新
-                var currentCacheKey = GetCacheKey(GetCurrentInstanceUrl(), _selectedTabIndex);
-                if (cacheKey == currentCacheKey)
+                // UI更新条件を修正：統合TL接続中はすべてのソーシャルTLデータを表示
+                var shouldUpdateUI = false;
+                if (_unifiedTimelineConnections.Count > 0 && _selectedTabIndex == 0) // 統合TL表示中
                 {
-                    AddTimelineItem(container, container.SOURCE);
+                    shouldUpdateUI = true;
+#if DEBUG
+                    Console.WriteLine($"Unified TL: showing data from {instanceName}");
+#endif
+                }
+                else
+                {
+                    // 通常のタブ表示：現在のタブと一致する場合のみ表示
+                    var currentCacheKey = GetCacheKey(GetCurrentInstanceUrl(), _selectedTabIndex);
+                    shouldUpdateUI = (cacheKey == currentCacheKey);
+#if DEBUG
+                    Console.WriteLine($"Normal tab: received='{cacheKey}', current='{currentCacheKey}', match={shouldUpdateUI}");
+#endif
+                }
+                
+                if (shouldUpdateUI)
+                {
+                    // 初回メッセージを削除（WebSocketで初めてデータを受信した場合）
+                    var loadingMessage = timelineContainer.Children.OfType<TextBlock>()
+                        .FirstOrDefault(tb => tb.Text == "タイムラインを読み込み中...");
+                    if (loadingMessage != null)
+                    {
+                        timelineContainer.Children.Remove(loadingMessage);
+                    }
+                    
+                    // ObservableCollectionに追加
+                    _timelineData.Insert(0, container);
+                    
+                    // UIスレッドでの表示サイズ制限
+                    if (_timelineData.Count > MAX_CACHED_ITEMS)
+                    {
+                        _timelineData.RemoveAt(_timelineData.Count - 1);
+                    }
+                    
+                    // SOURCEが空の場合は現在のインスタンス名を設定
+                    if (string.IsNullOrEmpty(container.SOURCE))
+                    {
+                        container.SOURCE = instanceName;
+                    }
+                    
+                    AddTimelineItem(container, instanceName);
                     
                     // 詳細パネルに表示
                     var note = new Note { Node = container.ORIGINAL };
                     SetTimelineDetails(container, note);
                     
-                    System.Diagnostics.Debug.WriteLine($"UI updated with data from {container.SOURCE}");
-                    Console.WriteLine($"UI updated with data from {container.SOURCE}");
+                    System.Diagnostics.Debug.WriteLine($"UI updated with data from {container.SOURCE}. Timeline children count: {timelineContainer.Children.Count}");
+#if DEBUG
+                    Console.WriteLine($"UI updated with data from {container.SOURCE}. Timeline children count: {timelineContainer.Children.Count}");
+#endif
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Data cached but not displayed (current: {currentCacheKey}, received: {cacheKey})");
+                    System.Diagnostics.Debug.WriteLine($"Data cached but not displayed");
                 }
             });
+        }
+        
+        private void SaveToTimelineCacheByType(string instanceName, TimeLineContainer container, int tabIndex)
+        {
+            // インスタンス別キャッシュを初期化
+            if (!_timelineCacheByType.ContainsKey(instanceName))
+            {
+                _timelineCacheByType[instanceName] = new Dictionary<string, List<TimeLineContainer>>();
+            }
+            
+            // タイムライン種別を現在のタブから判定
+            string timelineType = tabIndex switch
+            {
+                0 => "ソーシャルTL", // 統合TL（ソーシャルTLデータ）
+                1 => "ローカルTL",
+                2 => "ソーシャルTL",
+                3 => "グローバルTL",
+                _ => "その他"
+            };
+#if DEBUG
+            Console.WriteLine($"SaveToTimelineCacheByType: tabIndex={tabIndex}, timelineType={timelineType}, instanceName={instanceName}");
+#endif
+            
+            // タイムライン種別ごとのリストを初期化
+            if (!_timelineCacheByType[instanceName].ContainsKey(timelineType))
+            {
+                _timelineCacheByType[instanceName][timelineType] = new List<TimeLineContainer>();
+            }
+            
+            // データを保存
+            _timelineCacheByType[instanceName][timelineType].Insert(0, container);
+            
+            // サイズ制限
+            if (_timelineCacheByType[instanceName][timelineType].Count > MAX_CACHED_ITEMS)
+            {
+                _timelineCacheByType[instanceName][timelineType].RemoveAt(_timelineCacheByType[instanceName][timelineType].Count - 1);
+            }
+        }
+        
+        private void SaveToTimelineCacheByTypeIfNotExists(string instanceName, TimeLineContainer container, int tabIndex)
+        {
+            // インスタンス別キャッシュを初期化
+            if (!_timelineCacheByType.ContainsKey(instanceName))
+            {
+                _timelineCacheByType[instanceName] = new Dictionary<string, List<TimeLineContainer>>();
+            }
+            
+            // タイムライン種別を現在のタブから判定
+            string timelineType = tabIndex switch
+            {
+                0 => "ソーシャルTL", // 統合TL（ソーシャルTLデータ）
+                1 => "ローカルTL",
+                2 => "ソーシャルTL",
+                3 => "グローバルTL",
+                _ => "その他"
+            };
+            
+            // タイムライン種別ごとのリストを初期化
+            if (!_timelineCacheByType[instanceName].ContainsKey(timelineType))
+            {
+                _timelineCacheByType[instanceName][timelineType] = new List<TimeLineContainer>();
+            }
+            
+            // 重複チェック：同じDETAILとUPDATEDATの組み合わせがあるかチェック
+            var existingItems = _timelineCacheByType[instanceName][timelineType];
+            bool isDuplicate = existingItems.Any(item => 
+                item.DETAIL == container.DETAIL && 
+                item.UPDATEDAT == container.UPDATEDAT &&
+                item.USERNAME == container.USERNAME);
+            
+            if (!isDuplicate)
+            {
+                // データを保存
+                _timelineCacheByType[instanceName][timelineType].Insert(0, container);
+                
+                // サイズ制限
+                if (_timelineCacheByType[instanceName][timelineType].Count > MAX_CACHED_ITEMS)
+                {
+                    _timelineCacheByType[instanceName][timelineType].RemoveAt(_timelineCacheByType[instanceName][timelineType].Count - 1);
+                }
+                
+#if DEBUG
+                Console.WriteLine($"Added to cache (no duplicate): {timelineType} - {instanceName}");
+#endif
+            }
+            else
+            {
+#if DEBUG
+                Console.WriteLine($"Skipped duplicate entry: {timelineType} - {instanceName}");
+#endif
+            }
         }
 
         private async Task SubscribeToTimeline(string channel)
@@ -816,15 +1073,18 @@ namespace MiView
             _cancellationTokenSource = null;
         }
 
-        private void OnInstanceSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        private async void OnInstanceSelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             var selectedInstance = cmbInstanceSelect.SelectedItem?.ToString();
             if (!string.IsNullOrEmpty(selectedInstance))
             {
-                tsLabelMain.Text = $"インスタンス {selectedInstance} を選択しました。「接続」ボタンで接続できます。";
+                tsLabelMain.Text = $"サーバー {selectedInstance} を選択しました。";
                 
                 // タブを更新
                 UpdateTabs(selectedInstance);
+                
+                // 現在のタブに応じてタイムラインを切り替え（WebSocketは切断しない）
+                await SwitchTab(selectedInstance, _selectedTabIndex);
             }
         }
 
@@ -936,16 +1196,64 @@ namespace MiView
                         {
                             timelineContainer.Children.Clear();
                             _timelineItems.Clear();
+                            _timelineData.Clear();
                             _noteCount = 0;
                             
-                            // キャッシュからデータを復元
-                            var cacheKey = GetCacheKey(instanceUrl, tabIndex);
-                            if (_timelineCache.ContainsKey(cacheKey))
+                            // タイムライン種別ごとのキャッシュからデータを復元
+                            var tabName = tabIndex switch
                             {
-                                var cachedItems = _timelineCache[cacheKey];
-                                foreach (var item in cachedItems.AsEnumerable().Reverse())
+                                0 => "統合TL",
+                                1 => "ローカルTL", 
+                                2 => "ソーシャルTL",
+                                3 => "グローバルTL",
+                                _ => "統合TL"
+                            };
+                            
+                            // 統合TLの場合は特別処理
+                            if (tabIndex == 0)
+                            {
+                                // 全インスタンスのソーシャルTLデータを統合表示
+                                var allSocialData = new List<TimeLineContainer>();
+                                foreach (var instance in _timelineCacheByType.Keys)
+                                {
+                                    if (_timelineCacheByType[instance].ContainsKey("ソーシャルTL"))
+                                    {
+                                        allSocialData.AddRange(_timelineCacheByType[instance]["ソーシャルTL"]);
+                                    }
+                                }
+                                
+                                // 時系列でソート
+                                allSocialData = allSocialData.OrderByDescending(x => x.UPDATEDAT).Take(MAX_CACHED_ITEMS).ToList();
+                                
+                                foreach (var item in allSocialData)
+                                {
+                                    _timelineData.Add(item);
+                                }
+                                foreach (var item in allSocialData.AsEnumerable().Reverse())
                                 {
                                     AddTimelineItem(item, item.SOURCE);
+                                }
+                            }
+                            else
+                            {
+                                // 個別タイムライン表示
+                                if (_timelineCacheByType.ContainsKey(instanceUrl) && 
+                                    _timelineCacheByType[instanceUrl].ContainsKey(tabName))
+                                {
+                                    var cachedItems = _timelineCacheByType[instanceUrl][tabName];
+                                    foreach (var item in cachedItems)
+                                    {
+                                        _timelineData.Add(item);
+                                    }
+                                    foreach (var item in cachedItems.AsEnumerable().Reverse())
+                                    {
+                                        AddTimelineItem(item, item.SOURCE);
+                                    }
+                                }
+                                else
+                                {
+                                    // キャッシュがない場合はサンプルデータを表示
+                                    AddTestTimelineItems();
                                 }
                             }
                             
@@ -968,6 +1276,8 @@ namespace MiView
                             await Dispatcher.UIThread.InvokeAsync(() =>
                             {
                                 tsLabelMain.Text = $"接続成功: {instanceUrl} - {tabName}";
+                                cmdConnect.Content = "切断";
+                                _isConnected = true;
                             });
                         }
                     }
@@ -1074,7 +1384,289 @@ namespace MiView
         {
             SaveSettings();
             DisconnectWebSocket().Wait();
+            _reconnectTimer?.Dispose();
             base.OnClosed(e);
+        }
+
+        private async void ShowServerManagement(object? sender, RoutedEventArgs e)
+        {
+            var serverManagementWindow = new ServerManagementWindow(_instances, _instanceTokens);
+            
+            var result = await serverManagementWindow.ShowDialog<bool?>(this);
+            
+            if (result == true)
+            {
+                // サーバー管理ウィンドウで変更があった場合
+                LoadSettings();
+                RefreshInstanceList();
+            }
+        }
+        
+        private void RefreshInstanceList()
+        {
+            _instances.Clear();
+            if (File.Exists(SETTINGS_FILE))
+            {
+                try
+                {
+                    var jsonString = File.ReadAllText(SETTINGS_FILE);
+                    var settings = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString);
+                    
+                    if (settings != null)
+                    {
+                        foreach (var kvp in settings)
+                        {
+                            if (kvp.Key.StartsWith("instance_"))
+                            {
+                                var instanceName = kvp.Key.Substring("instance_".Length);
+                                _instances.Add(instanceName);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error loading instances: {ex.Message}");
+                }
+            }
+        }
+        
+        private void StartPersistentConnections()
+        {
+            Task.Run(async () =>
+            {
+                foreach (var instanceName in _instances)
+                {
+                    await ConnectPersistentInstance(instanceName);
+                }
+            });
+        }
+        
+        private async Task ConnectPersistentInstance(string instanceName)
+        {
+            if (!_persistentConnections.ContainsKey(instanceName))
+            {
+                _persistentConnections[instanceName] = new Dictionary<string, WebSocketTimeLineCommon>();
+            }
+            
+            // 統合TLはソーシャルTLを使用するため、持続接続ではソーシャルTLを除外
+            var timelineTypes = new[]
+            {
+                ("ローカルTL", WebSocketTimeLineCommon.ConnectTimeLineKind.Local),
+                ("グローバルTL", WebSocketTimeLineCommon.ConnectTimeLineKind.Global),
+                ("ホームTL", WebSocketTimeLineCommon.ConnectTimeLineKind.Home)
+            };
+            
+            foreach (var (timelineType, kind) in timelineTypes)
+            {
+                try
+                {
+                    var connection = WebSocketTimeLineCommon.CreateInstance(kind);
+                    if (connection != null)
+                    {
+                        connection.TimeLineDataReceived += OnPersistentTimeLineDataReceived;
+                        
+                        var apiKey = _instanceTokens.ContainsKey(instanceName) ? _instanceTokens[instanceName] : null;
+                        
+                        await Task.Run(() =>
+                        {
+                            try
+                            {
+                                connection.OpenTimeLine(instanceName, apiKey);
+                                WebSocketTimeLineCommon.ReadTimeLineContinuous(connection);
+                                
+                                _persistentConnections[instanceName][timelineType] = connection;
+                                Console.WriteLine($"Persistent connection established: {instanceName} - {timelineType}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Failed to connect {instanceName} - {timelineType}: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error creating connection for {instanceName} - {timelineType}: {ex.Message}");
+                }
+                
+                // 接続間隔を開ける
+                await Task.Delay(1000);
+            }
+        }
+        
+        private async void OnPersistentTimeLineDataReceived(object? sender, TimeLineContainer container)
+        {
+            // 持続接続からのデータはキャッシュのみに保存し、UI更新は行わない
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var instanceName = string.IsNullOrEmpty(container.SOURCE) ? GetCurrentInstanceUrl() : container.SOURCE;
+                
+                // データの種別を判定してキャッシュに保存
+                var timelineType = DetermineTimelineTypeFromSource(sender, instanceName);
+                if (!string.IsNullOrEmpty(timelineType))
+                {
+                    SaveToTimelineCacheByTypeWithName(instanceName, container, timelineType);
+                    Console.WriteLine($"Persistent cached (no UI): {instanceName} - {timelineType} - {container.DETAIL?.Substring(0, Math.Min(50, container.DETAIL?.Length ?? 0))}");
+                }
+            });
+        }
+        
+        private string DetermineTimelineTypeFromSource(object? sender, string instanceName)
+        {
+            // sender（WebSocketTimeLineCommon）から接続種別を特定
+            if (_persistentConnections.ContainsKey(instanceName))
+            {
+                foreach (var kvp in _persistentConnections[instanceName])
+                {
+                    if (kvp.Value == sender)
+                    {
+                        return kvp.Key;
+                    }
+                }
+            }
+            
+            // 統合TLの接続もチェック
+            if (_unifiedTimelineConnections.Contains(sender as WebSocketTimeLineCommon))
+            {
+                return "ソーシャルTL";
+            }
+            
+            return "ソーシャルTL"; // デフォルト
+        }
+        
+        private void SaveToTimelineCacheByTypeWithName(string instanceName, TimeLineContainer container, string timelineType)
+        {
+            // インスタンス別キャッシュを初期化
+            if (!_timelineCacheByType.ContainsKey(instanceName))
+            {
+                _timelineCacheByType[instanceName] = new Dictionary<string, List<TimeLineContainer>>();
+            }
+            
+            // タイムライン種別ごとのリストを初期化
+            if (!_timelineCacheByType[instanceName].ContainsKey(timelineType))
+            {
+                _timelineCacheByType[instanceName][timelineType] = new List<TimeLineContainer>();
+            }
+            
+            // 重複チェック
+            var existingItems = _timelineCacheByType[instanceName][timelineType];
+            bool isDuplicate = existingItems.Any(item => 
+                item.DETAIL == container.DETAIL && 
+                item.UPDATEDAT == container.UPDATEDAT &&
+                item.USERNAME == container.USERNAME);
+            
+            if (!isDuplicate)
+            {
+                // データを保存
+                _timelineCacheByType[instanceName][timelineType].Insert(0, container);
+                
+                // サイズ制限
+                if (_timelineCacheByType[instanceName][timelineType].Count > MAX_CACHED_ITEMS)
+                {
+                    _timelineCacheByType[instanceName][timelineType].RemoveAt(_timelineCacheByType[instanceName][timelineType].Count - 1);
+                }
+            }
+        }
+        
+        private void StartReconnectTimer()
+        {
+            _reconnectTimer = new Timer(CheckAndReconnect, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        }
+        
+        private void CheckAndReconnect(object? state)
+        {
+            Task.Run(async () =>
+            {
+                foreach (var instanceName in _instances.ToList())
+                {
+                    if (_persistentConnections.ContainsKey(instanceName))
+                    {
+                        var connectionsToReconnect = new List<string>();
+                        
+                        foreach (var kvp in _persistentConnections[instanceName].ToList())
+                        {
+                            var timelineType = kvp.Key;
+                            var connection = kvp.Value;
+                            
+                            // 接続状態をチェック（簡易的な実装）
+                            if (connection == null || !IsConnectionAlive(connection))
+                            {
+                                connectionsToReconnect.Add(timelineType);
+                                Console.WriteLine($"Connection lost, will reconnect: {instanceName} - {timelineType}");
+                            }
+                        }
+                        
+                        // 切断された接続を再接続
+                        foreach (var timelineType in connectionsToReconnect)
+                        {
+                            try
+                            {
+                                await ReconnectTimeline(instanceName, timelineType);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Reconnection failed: {instanceName} - {timelineType}: {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        private bool IsConnectionAlive(WebSocketTimeLineCommon connection)
+        {
+            // 接続状態の簡易チェック（実際の実装では適切なチェック方法を使用）
+            try
+            {
+                return connection != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        private async Task ReconnectTimeline(string instanceName, string timelineType)
+        {
+            // ソーシャルTLは統合TLが担当するため、持続接続では再接続しない
+            if (timelineType == "ソーシャルTL")
+            {
+                Console.WriteLine($"Skipping reconnection for Social TL (handled by unified TL): {instanceName}");
+                return;
+            }
+            
+            var kind = timelineType switch
+            {
+                "ローカルTL" => WebSocketTimeLineCommon.ConnectTimeLineKind.Local,
+                "グローバルTL" => WebSocketTimeLineCommon.ConnectTimeLineKind.Global,
+                "ホームTL" => WebSocketTimeLineCommon.ConnectTimeLineKind.Home,
+                _ => WebSocketTimeLineCommon.ConnectTimeLineKind.Local
+            };
+            
+            var connection = WebSocketTimeLineCommon.CreateInstance(kind);
+            if (connection != null)
+            {
+                connection.TimeLineDataReceived += OnPersistentTimeLineDataReceived;
+                
+                var apiKey = _instanceTokens.ContainsKey(instanceName) ? _instanceTokens[instanceName] : null;
+                
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        connection.OpenTimeLine(instanceName, apiKey);
+                        WebSocketTimeLineCommon.ReadTimeLineContinuous(connection);
+                        
+                        _persistentConnections[instanceName][timelineType] = connection;
+                        Console.WriteLine($"Reconnected: {instanceName} - {timelineType}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Reconnection failed: {instanceName} - {timelineType}: {ex.Message}");
+                    }
+                });
+            }
         }
     }
     

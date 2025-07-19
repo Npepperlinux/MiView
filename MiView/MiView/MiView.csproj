@@ -32,5 +32,9 @@
     <None Remove="Properties\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AvaloniaResource Include="Common\Fonts\Material\MaterialIcons-Regular.ttf" />
+  </ItemGroup>
+
 
 </Project>

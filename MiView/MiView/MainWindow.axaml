@@ -3,16 +3,21 @@
         x:Class="MiView.MainWindow"
         Title="MiView - MainForm"
         Width="800"
-        Height="700">
+        Height="700"
+        Background="#F0F0F0">
     
-    <DockPanel>
+    <DockPanel Background="Transparent">
         <!-- メニューバー -->
         <Menu DockPanel.Dock="Top" Background="#F0F0F0" BorderBrush="#8C8C8C" BorderThickness="0,0,0,1" Height="25">
-            <MenuItem Header="ファイル(_F)" Background="#F0F0F0" Foreground="Black">
-                <MenuItem Header="終了(_X)" Background="White" Foreground="Black" />
+            <MenuItem Header="ファイル(_F)" Background="#F0F0F0" Foreground="#000000">
+                <MenuItem Header="終了(_X)" Background="#FFFFFF" Foreground="#000000" />
             </MenuItem>
-            <MenuItem Header="表示(_V)" Background="#F0F0F0" Foreground="Black" />
-            <MenuItem Header="ヘルプ(_H)" Background="#F0F0F0" Foreground="Black" />
+            <MenuItem Header="サーバー(_S)" Background="#F0F0F0" Foreground="#000000">
+                <MenuItem Header="サーバー管理(_M)" Background="#FFFFFF" Foreground="#000000" Click="ShowServerManagement" />
+                <MenuItem Header="サーバー追加(_A)" Background="#FFFFFF" Foreground="#000000" Click="ShowAddInstanceDialog" />
+            </MenuItem>
+            <MenuItem Header="表示(_V)" Background="#F0F0F0" Foreground="#000000" />
+            <MenuItem Header="ヘルプ(_H)" Background="#F0F0F0" Foreground="#000000" />
         </Menu>
         
         <!-- インスタンス選択とボタン -->
@@ -20,38 +25,38 @@
             <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="150"/>
             </Grid.ColumnDefinitions>
             
             <ComboBox x:Name="cmbInstanceSelect" 
                       Grid.Column="0"
                       Margin="5,3"
-                      Background="White"
+                      Background="#FFFFFF"
                       BorderBrush="#8C8C8C"
                       BorderThickness="1"
-                      Foreground="Black"
-                      PlaceholderText="インスタンスを選択"/>
+                      Foreground="#000000"
+                      PlaceholderText="サーバーを選択してください"/>
             
             <Button x:Name="cmdConnect" 
                     Grid.Column="1"
                     Content="接続"
-                    Margin="5,3"
-                    Background="White"
+                    Margin="5,3,30,3"
+                    Background="#FFFFFF"
                     BorderBrush="#8C8C8C"
                     BorderThickness="1"
-                    Foreground="Black"
+                    Foreground="#000000"
                     Click="cmdConnect_Click"/>
                     
             <Button x:Name="cmdAddInstance" 
                     Grid.Column="1"
                     Content="+"
-                    Margin="95,3,5,3"
+                    Margin="125,3,5,3"
                     Width="20"
                     Height="20"
-                    Background="White"
+                    Background="#FFFFFF"
                     BorderBrush="#8C8C8C"
                     BorderThickness="1"
-                    Foreground="Black"
+                    Foreground="#000000"
                     FontSize="14"
                     FontWeight="Bold"
                     Click="ShowAddInstanceDialog"/>
@@ -71,14 +76,16 @@
                            Text="タブ件数：" 
                            Margin="5,0" 
                            VerticalAlignment="Center"
-                           Foreground="Black"/>
+                           Foreground="#000000"
+                           Background="Transparent"/>
                 
                 <TextBlock x:Name="tsLabelNoteCount" 
                            Grid.Column="1" 
                            Text="9999/9999" 
                            Margin="5,0" 
                            VerticalAlignment="Center"
-                           Foreground="Black"/>
+                           Foreground="#000000"
+                           Background="Transparent"/>
             </Grid>
         </Border>
         
@@ -90,15 +97,17 @@
                  Margin="2"
                  AcceptsReturn="True" 
                  TextWrapping="Wrap"
-                 Background="White"
-                 Foreground="Black"/>
+                 Background="#FFFFFF"
+                 Foreground="#000000"
+                 BorderBrush="#8C8C8C"
+                 BorderThickness="1"/>
         
         <!-- 詳細パネル -->
         <Border DockPanel.Dock="Bottom" 
                 Height="175" 
                 Margin="2" 
-                Background="White"
-                BorderBrush="Gray" 
+                Background="#FFFFFF"
+                BorderBrush="#808080" 
                 BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
