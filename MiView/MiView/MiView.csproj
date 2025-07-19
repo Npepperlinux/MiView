@@ -42,5 +42,6 @@
     <AvaloniaResource Include="Resources/Styles/Styles.xaml" />
   </ItemGroup>
 
+</Project>
 
 </Project>

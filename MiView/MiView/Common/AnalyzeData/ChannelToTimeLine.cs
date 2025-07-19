@@ -65,6 +65,10 @@ namespace MiView.Common.AnalyzeData
             // Container.DETAIL = Container.CW ? JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).CW) : JsonConverterCommon.GetStr(ChannelToTimeLineData.Note(Input).Text);
             Container.USERID = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.UserName);
             Container.USERNAME = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Name);
+            if (Container.USERNAME == string.Empty)
+            {
+                Container.USERNAME = "[" + Container.USERID + "]";
+            }
             Container.UPDATEDAT = JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.CreatedAt);
             Container.SOFTWARE = (ChannelToTimeLineData.Get(Input).Note.User.Instance.IsInvalidatedVersion ? "[☆]" : "") +
                                  JsonConverterCommon.GetStr(ChannelToTimeLineData.Get(Input).Note.User.Instance.SoftwareName) +
