@@ -192,92 +192,7 @@ namespace MiView.Common.TimeLine
         /// <param name="container"></param>
         public void AddTimeLineData(TimeLineContainer container)
         {
-<<<<<<< HEAD
             TimeLineData.Add(container);
-=======
-            // Object未セット
-            if (this._MainForm == null || sender == null)
-            {
-                return;
-            }
-            var Grid = (DataGridTimeLine)sender;
-
-            if (Grid.Visible == false)
-            {
-                return;
-            }
-
-            var CurrentCell = Grid.CurrentCell;
-            var CurrentRow = Grid.CurrentRow;
-
-            // 初期読み込み時
-            if (CurrentCell == null || CurrentRow == null)
-            {
-                return;
-            }
-
-            var CurrentRowData = Grid.Rows[CurrentRow.Index];
-            string OriginalHost = CurrentRowData.Cells[(int)TIMELINE_ELEMENT.ORIGINAL_HOST].Value.ToString() ?? string.Empty;
-            var Node = CurrentRowData.Cells[(int)TIMELINE_ELEMENT.ORIGINAL].Value;
-
-            if (Node == null || Node.ToString() == string.Empty)
-            {
-                return;
-            }
-
-            // TL情報をセット
-            this._MainForm.SetTimeLineContents(OriginalHost, (JsonNode)Node);
-        }
-
-        public void CreateTimeLineTab(ref MainForm MainForm, string Name, string Text)
-        {
-            var tpObj = GetControlFromMainForm(ref MainForm, null);
-            if (tpObj != null)
-            {
-                TabPage tp = new TabPage();
-                // 
-                // tpMain
-                // 
-                tp.Location = new Point(4, 4);
-                tp.Name = Name;
-                tp.Padding = new Padding(3);
-                tp.Size = new Size(776, 305);
-                tp.TabIndex = 0;
-                tp.Text = Text;
-                tp.UseVisualStyleBackColor = true;
-
-                if (tpObj.InvokeRequired)
-                {
-                    tpObj.Invoke(() => { tpObj.Controls.Add(tp); });
-                }
-                else
-                {
-                    tpObj.Controls.Add(tp);
-                }
-                if (MainForm.InvokeRequired)
-                {
-                    MainForm.Invoke(() => { tp.Focus(); });
-                }
-                else
-                {
-                    tp.Focus();
-                }
-            }
-        }
-
-        private Control? GetControlFromMainForm(ref MainForm MainForm, string? ChildDefinition)
-        {
-            var tpObj = MainForm.Controls.Cast<Control>().ToList().Find(r => { return r.Name == "tbMain"; });
-            if (ChildDefinition != null)
-            {
-                var tpObjb = tpObj.Controls.Find(ChildDefinition, false);
-                if (tpObjb.Length > 0)
-                {
-                    tpObj = tpObj.Controls.Find(ChildDefinition, false)[0];
-                }
-            }
-            return tpObj;
->>>>>>> upstream/main
         }
 
         /// <summary>
@@ -763,7 +678,6 @@ namespace MiView.Common.TimeLine
         {
             Row.DefaultCellStyle.BackColor = DesignColor;
         }
->>>>>>> upstream/main
     }
     */
 }
