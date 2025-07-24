@@ -10,7 +10,6 @@ namespace MiView.ScreenForms.PlainForm
         }
 
         public TextBlock MainLabel => tsLabelMain;
-        public TextBlock NoteCountLabel => tsLabelNoteCount;
         public TextBlock MemoryInfoLabel => tsLabelMemoryInfo;
         public TextBlock MemoryUsageLabel => tsLabelMemoryUsage;
     }

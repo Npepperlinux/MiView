@@ -39,7 +39,6 @@ namespace MiView
         private const int MAX_UI_ITEMS = 500;      // UI表示
         // 状態管理
         private int _selectedTabIndex = 0;
-        private int _noteCount = 0;
         
         // データ管理
         private List<TimeLineContainer> _timelineItems = new();
@@ -62,6 +61,22 @@ namespace MiView
         private bool _isJobQueueRunning = false;
         private const int JOBQUEUE_BATCH_SIZE = 10; // 一度に処理する最大件数
         private const int JOBQUEUE_INTERVAL_MS = 50; // 処理間隔（ms）
+        
+        // キャッシュクリーンアップ用
+        private Timer? _cacheCleanupTimer;
+        private const int CACHE_CLEANUP_INTERVAL_MINUTES = 5; // 5分間隔でチェック
+        private const int CACHE_CLEANUP_AGE_MINUTES = 30; // 30分以上前のデータを削除
+        private const int CACHE_CLEANUP_MIN_ITEMS = 50; // 50件を上回っている場合のみ実行
+        
+        // タブリスト定数（メモリ最適化）
+        private static readonly string[] DEFAULT_TABS = { "統合TL", "ローカルTL", "ソーシャルTL", "グローバルTL", "ホームTL" };
+        
+        // 定数string（メモリ最適化）
+        private const string LOADING_MESSAGE = "読み込み中...";
+        private const string CONNECTED_MESSAGE = "接続済み";
+        private const string DISCONNECTED_MESSAGE = "切断しました";
+        private const string DEBUG_PREFIX = "[DEBUG]";
+        private const string ERROR_PREFIX = "[ERROR]";
 
         /// <summary>
         /// タイムライン表示用の列定義
@@ -128,7 +143,7 @@ namespace MiView
                 return Avalonia.Media.Brush.Parse(UIColors.BackgroundRenote);
             }
             
-            var isEvenRow = (_noteCount % 2 == 0);
+            var isEvenRow = (_timelineItems.Count % 2 == 0);
             return isEvenRow ? Avalonia.Media.Brush.Parse(UIColors.BackgroundWhite) : Avalonia.Media.Brush.Parse(UIColors.BackgroundGray);
         }
 
@@ -185,6 +200,7 @@ namespace MiView
             _connectionManager.TimeLineDataReceived += OnConnectionManagerTimeLineDataReceived;
             _connectionManager.ConnectionStatusChanged += OnConnectionStatusChanged;
             InitializeUI();
+            StartCacheCleanupTimer();
             for (int i = 0; i < MAX_UI_ITEMS; i++)
             {
                 var emptyItem = new TimeLineContainer
@@ -223,7 +239,6 @@ namespace MiView
             
             // 初期メッセージ
             statusBarControl.MainLabel.Text = "MiView - 起動中...";
-            statusBarControl.NoteCountLabel.Text = "0/0";
             
             // 設定を読み込み
             LoadSettings();
@@ -323,7 +338,6 @@ namespace MiView
             // 既存のタイムラインをクリア
             timelineControl.TimelineContainer.Children.Clear();
             _timelineItems.Clear();
-            _noteCount = 0;
             
             // 各状態の組み合わせでダミーデータを生成
             var dummyItems = new[]
@@ -370,7 +384,6 @@ namespace MiView
                 AddTimelineItem(item);
             }
             
-            statusBarControl.NoteCountLabel.Text = $"{_noteCount}/9999";
         }
 
         /// <summary>
@@ -384,7 +397,7 @@ namespace MiView
                 USERNAME = username,
                 USERID = userid,
                 DETAIL = content,
-                UPDATEDAT = DateTime.Now.AddMinutes(-_noteCount).ToString("yyyy-MM-dd HH:mm:ss.fff"),
+                UPDATEDAT = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"),
                 SOURCE = isLocal ? "mi.ruruke.moe" : "misskey.flowers",
                 SOFTWARE = "Misskey",
                 RENOTED = isRenoted,
@@ -645,9 +658,9 @@ namespace MiView
             // TimelineContainerの件数制限
             if (timelineControl.TimelineContainer.Children.Count > MAX_UI_ITEMS)
             {
-                Console.WriteLine($"[DEBUG] TimelineContainer制限: {timelineControl.TimelineContainer.Children.Count}件 → {MAX_UI_ITEMS}件に削減");
+                Console.WriteLine($"{DEBUG_PREFIX} TimelineContainer制限: {timelineControl.TimelineContainer.Children.Count}件 → {MAX_UI_ITEMS}件に削減");
                 timelineControl.TimelineContainer.Children.RemoveAt(timelineControl.TimelineContainer.Children.Count - 1);
-                Console.WriteLine($"[DEBUG] TimelineContainer削除後: {timelineControl.TimelineContainer.Children.Count}件");
+                Console.WriteLine($"{DEBUG_PREFIX} TimelineContainer削除後: {timelineControl.TimelineContainer.Children.Count}件");
             }
             
             // リストに追加
@@ -656,13 +669,11 @@ namespace MiView
             // _timelineItemsの件数制限
             if (_timelineItems.Count > MAX_UI_ITEMS)
             {
-                Console.WriteLine($"[DEBUG] _timelineItems制限: {_timelineItems.Count}件 → {MAX_UI_ITEMS}件に削減");
+                Console.WriteLine($"{DEBUG_PREFIX} _timelineItems制限: {_timelineItems.Count}件 → {MAX_UI_ITEMS}件に削減");
                 _timelineItems.RemoveAt(_timelineItems.Count - 1);
-                Console.WriteLine($"[DEBUG] _timelineItems削除後: {_timelineItems.Count}件");
+                Console.WriteLine($"{DEBUG_PREFIX} _timelineItems削除後: {_timelineItems.Count}件");
             }
             
-            // 投稿数をカウント
-            _noteCount++;
             UpdateStatusBarInfo();
         }
         
@@ -896,7 +907,7 @@ namespace MiView
                 }
                 
                 // サーバー用のタブを作成（統合TL + 標準的なタイムラインのみ、独自TLは除外）
-                var serverTabs = new List<string> { "統合TL", "ローカルTL", "ソーシャルTL", "グローバルTL", "ホームTL" };
+                var serverTabs = DEFAULT_TABS.ToList();
                 _serverTabs[normalizedUrl] = serverTabs;
                 
                 // 選択状態にする
@@ -1039,9 +1050,9 @@ namespace MiView
                 // キャッシュサイズ制限
                 if (_timelineCache[cacheKey].Count > MAX_CACHED_ITEMS)
                 {
-                    Console.WriteLine($"[DEBUG] _timelineCache[{cacheKey}]制限: {_timelineCache[cacheKey].Count}件 → {MAX_CACHED_ITEMS}件に削減");
+                    Console.WriteLine($"{DEBUG_PREFIX} _timelineCache[{cacheKey}]制限: {_timelineCache[cacheKey].Count}件 → {MAX_CACHED_ITEMS}件に削減");
                     _timelineCache[cacheKey].RemoveAt(_timelineCache[cacheKey].Count - 1);
-                    Console.WriteLine($"[DEBUG] _timelineCache[{cacheKey}]削除後: {_timelineCache[cacheKey].Count}件");
+                    Console.WriteLine($"{DEBUG_PREFIX} _timelineCache[{cacheKey}]削除後: {_timelineCache[cacheKey].Count}件");
                 }
                 
                 // UI更新条件を修正：統合TL接続中はすべてのソーシャルTLデータを表示
@@ -1080,9 +1091,9 @@ namespace MiView
                     // UI表示件数制限
                     if (_timelineData.Count > MAX_UI_ITEMS)
                     {
-                        Console.WriteLine($"[DEBUG] _timelineData制限: {_timelineData.Count}件 → {MAX_UI_ITEMS}件に削減");
+                        Console.WriteLine($"{DEBUG_PREFIX} _timelineData制限: {_timelineData.Count}件 → {MAX_UI_ITEMS}件に削減");
                         _timelineData.RemoveAt(_timelineData.Count - 1);
-                        Console.WriteLine($"[DEBUG] _timelineData削除後: {_timelineData.Count}件");
+                        Console.WriteLine($"{DEBUG_PREFIX} _timelineData削除後: {_timelineData.Count}件");
                     }
 
                     // タイムラインの先頭に追加
@@ -1090,9 +1101,9 @@ namespace MiView
                     // UI表示件数制限
                     if (timelineControl.TimelineContainer.Children.Count > MAX_UI_ITEMS)
                     {
-                        Console.WriteLine($"[DEBUG] OnConnectionManager - TimelineContainer制限: {timelineControl.TimelineContainer.Children.Count}件 → {MAX_UI_ITEMS}件に削減");
+                        Console.WriteLine($"{DEBUG_PREFIX} OnConnectionManager - TimelineContainer制限: {timelineControl.TimelineContainer.Children.Count}件 → {MAX_UI_ITEMS}件に削減");
                         timelineControl.TimelineContainer.Children.RemoveAt(timelineControl.TimelineContainer.Children.Count - 1);
-                        Console.WriteLine($"[DEBUG] OnConnectionManager - TimelineContainer削除後: {timelineControl.TimelineContainer.Children.Count}件");
+                        Console.WriteLine($"{DEBUG_PREFIX} OnConnectionManager - TimelineContainer削除後: {timelineControl.TimelineContainer.Children.Count}件");
                     }
                     // SOURCEが空の場合は現在のインスタンス名を設定
                     if (string.IsNullOrEmpty(container.SOURCE))
@@ -1899,8 +1910,7 @@ namespace MiView
                     timelineControl.TimelineContainer.Children.Clear();
                     _timelineItems.Clear();
                     _timelineData.Clear();
-                    _noteCount = 0;
-                    
+                            
                     // タイムライン種別ごとのキャッシュからデータを復元
                     var cacheTabName = tabIndex switch
                     {
@@ -2056,7 +2066,7 @@ namespace MiView
                         // サーバータブを復元（標準的なタイムラインのみ、独自TLは除外）
                         foreach (var instance in settings.Instances)
                         {
-                            var serverTabs = new List<string> { "統合TL", "ローカルTL", "ソーシャルTL", "グローバルTL", "ホームTL" };
+                            var serverTabs = DEFAULT_TABS.ToList();
                             _serverTabs[instance] = serverTabs;
                             Console.WriteLine($"Tabs initialized for {instance}: {string.Join(", ", serverTabs)}");
                         }
@@ -2145,6 +2155,87 @@ namespace MiView
             return url;
         }
 
+        private void StartCacheCleanupTimer()
+        {
+            _cacheCleanupTimer = new Timer(CleanupOldCacheData, null, 
+                TimeSpan.FromMinutes(CACHE_CLEANUP_INTERVAL_MINUTES), 
+                TimeSpan.FromMinutes(CACHE_CLEANUP_INTERVAL_MINUTES));
+        }
+
+        private void CleanupOldCacheData(object? state)
+        {
+            try
+            {
+                Console.WriteLine($"{DEBUG_PREFIX} キャッシュクリーンアップ開始");
+                var cutoffTime = DateTime.Now.AddMinutes(-CACHE_CLEANUP_AGE_MINUTES);
+                
+                // _timelineCache のクリーンアップ
+                foreach (var cacheKey in _timelineCache.Keys)
+                {
+                    var cache = _timelineCache[cacheKey];
+                    if (cache.Count > CACHE_CLEANUP_MIN_ITEMS)
+                    {
+                        var beforeCount = cache.Count;
+                        var removedCount = 0;
+                        
+                        for (int i = cache.Count - 1; i >= 0; i--)
+                        {
+                            if (DateTime.TryParse(cache[i].UPDATEDAT, out var updateTime))
+                            {
+                                if (updateTime < cutoffTime)
+                                {
+                                    cache.RemoveAt(i);
+                                    removedCount++;
+                                }
+                            }
+                        }
+                        
+                        if (removedCount > 0)
+                        {
+                            Console.WriteLine($"{DEBUG_PREFIX} クリーンアップ[{cacheKey}]: {beforeCount}件 → {cache.Count}件 ({removedCount}件削除)");
+                        }
+                    }
+                }
+                
+                // _timelineCacheByType のクリーンアップ
+                foreach (var instanceName in _timelineCacheByType.Keys)
+                {
+                    foreach (var timelineType in _timelineCacheByType[instanceName].Keys)
+                    {
+                        var cache = _timelineCacheByType[instanceName][timelineType];
+                        if (cache.Count > CACHE_CLEANUP_MIN_ITEMS)
+                        {
+                            var beforeCount = cache.Count;
+                            var removedCount = 0;
+                            
+                            for (int i = cache.Count - 1; i >= 0; i--)
+                            {
+                                if (DateTime.TryParse(cache[i].UPDATEDAT, out var updateTime))
+                                {
+                                    if (updateTime < cutoffTime)
+                                    {
+                                        cache.RemoveAt(i);
+                                        removedCount++;
+                                    }
+                                }
+                            }
+                            
+                            if (removedCount > 0)
+                            {
+                                Console.WriteLine($"{DEBUG_PREFIX} クリーンアップ[{instanceName}-{timelineType}]: {beforeCount}件 → {cache.Count}件 ({removedCount}件削除)");
+                            }
+                        }
+                    }
+                }
+                
+                Console.WriteLine($"{DEBUG_PREFIX} キャッシュクリーンアップ完了");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{ERROR_PREFIX} キャッシュクリーンアップエラー: {ex.Message}");
+            }
+        }
+
         private void ApplyServerCacheLimit(string instanceName)
         {
             if (!_timelineCacheByType.ContainsKey(instanceName))
@@ -2155,7 +2246,7 @@ namespace MiView
             
             if (totalCount > MAX_CACHED_ITEMS)
             {
-                Console.WriteLine($"[DEBUG] サーバー[{instanceName}]キャッシュ制限: {totalCount}件 → {MAX_CACHED_ITEMS}件に削減");
+                Console.WriteLine($"{DEBUG_PREFIX} サーバー[{instanceName}]キャッシュ制限: {totalCount}件 → {MAX_CACHED_ITEMS}件に削減");
                 
                 // 古いアイテムから削除（各タイムラインから最古のものを順次削除）
                 while (_timelineCacheByType[instanceName].Values.Sum(list => list.Count) > MAX_CACHED_ITEMS)
@@ -2177,15 +2268,12 @@ namespace MiView
                 }
                 
                 var newTotal = _timelineCacheByType[instanceName].Values.Sum(list => list.Count);
-                Console.WriteLine($"[DEBUG] サーバー[{instanceName}]キャッシュ削除後: {newTotal}件");
+                Console.WriteLine($"{DEBUG_PREFIX} サーバー[{instanceName}]キャッシュ削除後: {newTotal}件");
             }
         }
 
         private void UpdateStatusBarInfo()
         {
-            // 投稿件数表示
-            statusBarControl.NoteCountLabel.Text = $"{_noteCount}/{MAX_UI_ITEMS}";
-            
 #if DEBUG
             // 各キャッシュの詳細情報を収集
             var cacheDetails = new List<string>();
@@ -2230,6 +2318,9 @@ namespace MiView
         {
             // UIを先に閉じる
             Console.WriteLine("Application closing - UI will close first");
+            
+            // キャッシュクリーンアップタイマーを停止
+            _cacheCleanupTimer?.Dispose();
             
             // 設定を保存
             SaveSettings();
@@ -2339,7 +2430,7 @@ namespace MiView
                         // サーバータブを復元（標準的なタイムラインのみ、独自TLは除外）
                         foreach (var instance in settings.Instances)
                         {
-                            var serverTabs = new List<string> { "統合TL", "ローカルTL", "ソーシャルTL", "グローバルTL", "ホームTL" };
+                            var serverTabs = DEFAULT_TABS.ToList();
                             _serverTabs[instance] = serverTabs;
                         }
                     }
