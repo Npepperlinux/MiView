@@ -32,7 +32,7 @@ namespace MiView
         private Dictionary<string, string> _instanceTokens = new();
         // 定数
         private const string SETTINGS_FILE = "settings.json";
-        private const int MAX_CACHED_ITEMS = 1000; // 内部キャッシュ
+        private const int MAX_CACHED_ITEMS = 500; // 内部キャッシュ
         private const string DEFAULT_INSTANCE = "misskey.io";
         private const string DEFAULT_SOFTWARE = "Misskey";
 
@@ -642,13 +642,23 @@ namespace MiView
             // タイムラインの先頭に追加
             timelineControl.TimelineContainer.Children.Insert(0, timelineGrid);
             
+            // TimelineContainerの件数制限
+            if (timelineControl.TimelineContainer.Children.Count > MAX_UI_ITEMS)
+            {
+                Console.WriteLine($"[DEBUG] TimelineContainer制限: {timelineControl.TimelineContainer.Children.Count}件 → {MAX_UI_ITEMS}件に削減");
+                timelineControl.TimelineContainer.Children.RemoveAt(timelineControl.TimelineContainer.Children.Count - 1);
+                Console.WriteLine($"[DEBUG] TimelineContainer削除後: {timelineControl.TimelineContainer.Children.Count}件");
+            }
+            
             // リストに追加
             _timelineItems.Add(timelineItem);
             
             // _timelineItemsの件数制限
             if (_timelineItems.Count > MAX_UI_ITEMS)
             {
+                Console.WriteLine($"[DEBUG] _timelineItems制限: {_timelineItems.Count}件 → {MAX_UI_ITEMS}件に削減");
                 _timelineItems.RemoveAt(_timelineItems.Count - 1);
+                Console.WriteLine($"[DEBUG] _timelineItems削除後: {_timelineItems.Count}件");
             }
             
             // 投稿数をカウント
@@ -1029,7 +1039,9 @@ namespace MiView
                 // キャッシュサイズ制限
                 if (_timelineCache[cacheKey].Count > MAX_CACHED_ITEMS)
                 {
+                    Console.WriteLine($"[DEBUG] _timelineCache[{cacheKey}]制限: {_timelineCache[cacheKey].Count}件 → {MAX_CACHED_ITEMS}件に削減");
                     _timelineCache[cacheKey].RemoveAt(_timelineCache[cacheKey].Count - 1);
+                    Console.WriteLine($"[DEBUG] _timelineCache[{cacheKey}]削除後: {_timelineCache[cacheKey].Count}件");
                 }
                 
                 // UI更新条件を修正：統合TL接続中はすべてのソーシャルTLデータを表示
@@ -1068,7 +1080,9 @@ namespace MiView
                     // UI表示件数制限
                     if (_timelineData.Count > MAX_UI_ITEMS)
                     {
+                        Console.WriteLine($"[DEBUG] _timelineData制限: {_timelineData.Count}件 → {MAX_UI_ITEMS}件に削減");
                         _timelineData.RemoveAt(_timelineData.Count - 1);
+                        Console.WriteLine($"[DEBUG] _timelineData削除後: {_timelineData.Count}件");
                     }
 
                     // タイムラインの先頭に追加
@@ -1076,7 +1090,9 @@ namespace MiView
                     // UI表示件数制限
                     if (timelineControl.TimelineContainer.Children.Count > MAX_UI_ITEMS)
                     {
+                        Console.WriteLine($"[DEBUG] OnConnectionManager - TimelineContainer制限: {timelineControl.TimelineContainer.Children.Count}件 → {MAX_UI_ITEMS}件に削減");
                         timelineControl.TimelineContainer.Children.RemoveAt(timelineControl.TimelineContainer.Children.Count - 1);
+                        Console.WriteLine($"[DEBUG] OnConnectionManager - TimelineContainer削除後: {timelineControl.TimelineContainer.Children.Count}件");
                     }
                     // SOURCEが空の場合は現在のインスタンス名を設定
                     if (string.IsNullOrEmpty(container.SOURCE))
@@ -1136,7 +1152,9 @@ namespace MiView
             // サイズ制限
             if (_timelineCacheByType[instanceName][timelineType].Count > MAX_CACHED_ITEMS)
             {
+                Console.WriteLine($"[DEBUG] _timelineCacheByType[{instanceName}][{timelineType}]制限: {_timelineCacheByType[instanceName][timelineType].Count}件 → {MAX_CACHED_ITEMS}件に削減");
                 _timelineCacheByType[instanceName][timelineType].RemoveAt(_timelineCacheByType[instanceName][timelineType].Count - 1);
+                Console.WriteLine($"[DEBUG] _timelineCacheByType[{instanceName}][{timelineType}]削除後: {_timelineCacheByType[instanceName][timelineType].Count}件");
             }
         }
         
@@ -1180,7 +1198,9 @@ namespace MiView
                 // サイズ制限
                 if (_timelineCacheByType[instanceName][timelineType].Count > MAX_CACHED_ITEMS)
                 {
+                    Console.WriteLine($"[DEBUG] SaveIfNotExists - _timelineCacheByType[{instanceName}][{timelineType}]制限: {_timelineCacheByType[instanceName][timelineType].Count}件 → {MAX_CACHED_ITEMS}件に削減");
                     _timelineCacheByType[instanceName][timelineType].RemoveAt(_timelineCacheByType[instanceName][timelineType].Count - 1);
+                    Console.WriteLine($"[DEBUG] SaveIfNotExists - _timelineCacheByType[{instanceName}][{timelineType}]削除後: {_timelineCacheByType[instanceName][timelineType].Count}件");
                 }
                 
 #if DEBUG
