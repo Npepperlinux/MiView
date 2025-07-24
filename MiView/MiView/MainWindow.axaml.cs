@@ -62,6 +62,9 @@ namespace MiView
         private const int JOBQUEUE_BATCH_SIZE = 10; // 一度に処理する最大件数
         private const int JOBQUEUE_INTERVAL_MS = 50; // 処理間隔（ms）
         
+        // **MEMORY LEAK FIX: Add size limits for job queue**
+        private const int MAX_JOBQUEUE_SIZE = 500; // 最大キュー容量
+        
         // キャッシュクリーンアップ用
         private Timer? _cacheCleanupTimer;
         private const int CACHE_CLEANUP_INTERVAL_MINUTES = 3; // 3分間隔でチェック（より頻繁に）
@@ -1395,6 +1398,14 @@ namespace MiView
         {
             lock (_timelineJobQueue)
             {
+                // **MEMORY LEAK FIX: Enforce queue size limit**
+                if (_timelineJobQueue.Count >= MAX_JOBQUEUE_SIZE)
+                {
+                    // 古いジョブを削除してメモリ不足を防ぐ
+                    var removedJob = _timelineJobQueue.Dequeue();
+                    Console.WriteLine($"{DEBUG_PREFIX} JobQueue満杯のため古いジョブ削除: {removedJob.InstanceName}-{removedJob.TimelineType}");
+                }
+                
                 _timelineJobQueue.Enqueue((e.InstanceName, e.TimelineType, e.Container));
             }
             if (!_isJobQueueRunning)
@@ -1425,27 +1436,37 @@ namespace MiView
                 {
                     foreach (var (instanceName, timelineType, container) in batch)
                     {
-                        // TimeLineCreatorにデータを追加
-                        _timelineCreator.AddTimeLineData(container);
-                        // タイムライン種別ごとのキャッシュに保存
-                        SaveToTimelineCacheByType(instanceName, container, GetTabIndexFromTimelineType(timelineType));
-                        // UI表示の判定
-                        bool shouldUpdateUI = ShouldUpdateUI(instanceName, timelineType);
-                        if (shouldUpdateUI)
+                        try
                         {
-                            if (string.IsNullOrEmpty(container.SOURCE))
+                            // TimeLineCreatorにデータを追加
+                            _timelineCreator.AddTimeLineData(container);
+                            // タイムライン種別ごとのキャッシュに保存
+                            SaveToTimelineCacheByType(instanceName, container, GetTabIndexFromTimelineType(timelineType));
+                            // UI表示の判定
+                            bool shouldUpdateUI = ShouldUpdateUI(instanceName, timelineType);
+                            if (shouldUpdateUI)
                             {
-                                container.SOURCE = instanceName;
+                                if (string.IsNullOrEmpty(container.SOURCE))
+                                {
+                                    container.SOURCE = instanceName;
+                                }
+                                if (_selectedTabIndex == 0)
+                                {
+                                    // 統合TLの場合は特別処理
+                                }
+                                AddTimelineItem(container, instanceName);
+                                var note = new Note { Node = container.ORIGINAL ?? System.Text.Json.Nodes.JsonNode.Parse("{}")! };
+                                SetTimelineDetails(container, note);
                             }
-                            if (_selectedTabIndex == 0)
-                            {
-                                // 統合TLの場合は特別処理
-                            }
-                            AddTimelineItem(container, instanceName);
-                            var note = new Note { Node = container.ORIGINAL ?? System.Text.Json.Nodes.JsonNode.Parse("{}")! };
-                            SetTimelineDetails(container, note);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"{ERROR_PREFIX} ジョブ処理エラー [{instanceName}-{timelineType}]: {ex.Message}");
                         }
                     }
+                    
+                    // **MEMORY LEAK FIX: Clear batch to ensure garbage collection**
+                    batch.Clear();
                 });
                 await Task.Delay(JOBQUEUE_INTERVAL_MS);
             }
@@ -2271,6 +2292,15 @@ namespace MiView
                     // WebSocketConnectionManagerのクリーンアップ
                     _connectionManager?.CleanupInactiveConnections();
                     
+                    // JobQueueのクリーンアップ
+                    lock (_timelineJobQueue)
+                    {
+                        if (_timelineJobQueue.Count > MAX_JOBQUEUE_SIZE / 2) // 50%を超えたら警告
+                        {
+                            Console.WriteLine($"{DEBUG_PREFIX} JobQueue使用率高: {_timelineJobQueue.Count}/{MAX_JOBQUEUE_SIZE}");
+                        }
+                    }
+                    
                     // ガベージコレクションを実行してメモリを解放
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
@@ -2410,6 +2440,13 @@ namespace MiView
             
             // キャッシュクリーンアップタイマーを停止
             _cacheCleanupTimer?.Dispose();
+            
+            // **MEMORY LEAK FIX: Clear job queue on exit**
+            lock (_timelineJobQueue)
+            {
+                _timelineJobQueue.Clear();
+                Console.WriteLine($"{DEBUG_PREFIX} JobQueue cleared on exit");
+            }
             
             // 設定を保存
             SaveSettings();
