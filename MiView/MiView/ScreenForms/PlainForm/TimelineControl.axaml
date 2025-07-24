@@ -28,7 +28,8 @@
                     <Border Grid.Column="4" BorderBrush="{StaticResource TabControlBorderBrush}" BorderThickness="0,0,1,0" Background="{StaticResource TabControlBackgroundBrush}" />
                     <Border Grid.Column="5" Background="{StaticResource TabControlBackgroundBrush}" />
                 </Grid>
-                <ScrollViewer Grid.Row="1" x:Name="timelineScrollViewer" Background="#FFFFFF" Padding="0">
+                <ScrollViewer Grid.Row="1" x:Name="timelineScrollViewer" Background="#FFFFFF" Padding="0"
+                              ScrollChanged="OnTimelineScrollChanged">
                     <StackPanel x:Name="timelineContainer" Background="#FFFFFF">
                         <TextBlock Text="タイムラインを読み込み中..." HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#8C8C8C" FontSize="12" Margin="20" Background="#FFFFFF" />
                     </StackPanel>
