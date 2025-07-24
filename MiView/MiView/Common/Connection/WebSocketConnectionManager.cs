@@ -519,6 +519,7 @@ namespace MiView.Common.Connection
         public void Dispose()
         {
             _reconnectTimer?.Dispose();
+            _connectionSemaphore?.Dispose();
             // 非同期で切断処理を実行（UIを待たせない）
             Task.Run(async () =>
             {

@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace MiView.Common.Connection.WebSocket
 {
-    internal class WebSocketManager
+    internal class WebSocketManager : IDisposable
     {
         /// <summary>
         /// Host
@@ -410,6 +410,25 @@ namespace MiView.Common.Connection.WebSocket
         protected void CallDataReceived(string ResponseMessage)
         {
             DataReceived(this, new ConnectDataReceivedEventArgs() { MessageRaw = ResponseMessage });
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _ConnectionClose = true;
+                
+                if (_WebSocket != null && _WebSocket.State == WebSocketState.Open)
+                {
+                    _WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Dispose", CancellationToken.None).Wait(TimeSpan.FromSeconds(5));
+                }
+                
+                _WebSocket?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error during WebSocketManager dispose: {ex.Message}");
+            }
         }
     }
 }

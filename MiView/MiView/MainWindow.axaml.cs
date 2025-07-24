@@ -645,6 +645,12 @@ namespace MiView
             // リストに追加
             _timelineItems.Add(timelineItem);
             
+            // _timelineItemsの件数制限
+            if (_timelineItems.Count > MAX_UI_ITEMS)
+            {
+                _timelineItems.RemoveAt(_timelineItems.Count - 1);
+            }
+            
             // 投稿数をカウント
             _noteCount++;
             statusBarControl.NoteCountLabel.Text = $"{_noteCount}/9999";
