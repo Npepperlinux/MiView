@@ -2304,29 +2304,52 @@ namespace MiView
                     }
                 }
                 
-                // **MEMORY LEAK FIX: Cleanup other components**
+                // **MEMORY LEAK FIX: Cleanup other components (WebSocket connections PROTECTED)**
                 try
                 {
-                    // WebSocketConnectionManagerのクリーンアップ
-                    _connectionManager?.CleanupInactiveConnections();
+                    // **PRIORITY 1: WebSocket接続の状況確認（切断は絶対にしない）**
+                    _connectionManager?.CleanupInactiveConnections(); // 保護的クリーンアップのみ
                     
-                    // JobQueueのクリーンアップ
+                    // **PRIORITY 2: WebSocket保護のため他のメモリ使用量を積極的に削減**
+                    
+                    // JobQueueの積極的クリーンアップ
                     lock (_timelineJobQueue)
                     {
-                        if (_timelineJobQueue.Count > MAX_JOBQUEUE_SIZE / 2) // 50%を超えたら警告
+                        if (_timelineJobQueue.Count > MAX_JOBQUEUE_SIZE / 4) // 25%で早期警告
                         {
-                            Console.WriteLine($"{DEBUG_PREFIX} JobQueue使用率高: {_timelineJobQueue.Count}/{MAX_JOBQUEUE_SIZE}");
+                            Console.WriteLine($"{DEBUG_PREFIX} WebSocket保護のためJobQueue早期クリーンアップ: {_timelineJobQueue.Count}/{MAX_JOBQUEUE_SIZE}");
+                            
+                            // WebSocket保護のため、JobQueueを積極的に削減
+                            while (_timelineJobQueue.Count > MAX_JOBQUEUE_SIZE / 2)
+                            {
+                                _timelineJobQueue.Dequeue(); // 古いジョブを削除
+                            }
+                            Console.WriteLine($"{DEBUG_PREFIX} JobQueue削減完了: {_timelineJobQueue.Count}件に削減");
                         }
                     }
                     
-                    // ガベージコレクションを実行してメモリを解放
-                    GC.Collect();
+                    // **PRIORITY 3: UI要素の積極的削減でWebSocket保護**
+                    if (_timelineItems.Count > MAX_UI_ITEMS / 2)
+                    {
+                        Console.WriteLine($"{DEBUG_PREFIX} WebSocket保護のためUI要素削減: {_timelineItems.Count}→{MAX_UI_ITEMS/2}");
+                        var itemsToRemove = _timelineItems.Count - MAX_UI_ITEMS / 2;
+                        for (int i = 0; i < itemsToRemove && _timelineItems.Count > 0; i++)
+                        {
+                            _timelineItems.RemoveAt(_timelineItems.Count - 1);
+                        }
+                    }
+                    
+                    // **強化されたガベージコレクション（WebSocket保護のため）**
+                    GC.Collect(2, GCCollectionMode.Aggressive); // より積極的なGC
                     GC.WaitForPendingFinalizers();
-                    GC.Collect();
+                    GC.Collect(2, GCCollectionMode.Aggressive);
+                    
+                    Console.WriteLine($"{DEBUG_PREFIX} WebSocket保護のためのメモリ最適化完了");
                 }
                 catch (Exception cleanupEx)
                 {
                     Console.WriteLine($"{ERROR_PREFIX} 追加クリーンアップエラー: {cleanupEx.Message}");
+                    Console.WriteLine($"{DEBUG_PREFIX} エラーが発生してもWebSocket接続は保護されています");
                 }
                 
                 Console.WriteLine($"{DEBUG_PREFIX} キャッシュクリーンアップ完了");

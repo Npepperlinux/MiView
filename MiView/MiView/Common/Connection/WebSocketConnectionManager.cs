@@ -22,10 +22,10 @@ namespace MiView.Common.Connection
         private const int RECONNECT_INTERVAL_MINUTES = 1; // **UX IMPROVEMENT: 1分間隔に短縮（より迅速な再接続）**
         private SemaphoreSlim _connectionSemaphore = new SemaphoreSlim(10, 10); // 最大10個同時接続
         
-        // **MEMORY LEAK FIX: Add size limits for collections**
-        private const int MAX_PERSISTENT_CONNECTIONS = 50; // 最大50インスタンス
-        private const int MAX_UNIFIED_CONNECTIONS = 20; // 統合TL接続最大20
-        private const int MAX_INACTIVE_HOURS = 2; // 2時間非アクティブで削除
+        // **WEBSOCKET ABSOLUTE PROTECTION: Generous limits to never force disconnection**
+        private const int MAX_PERSISTENT_CONNECTIONS = 200; // **増加: WebSocket保護のため制限を大幅緩和**
+        private const int MAX_UNIFIED_CONNECTIONS = 100; // **増加: 統合TL接続制限を大幅緩和**
+        private const int MAX_INACTIVE_HOURS = int.MaxValue; // **無制限: 非アクティブでも絶対切断しない**
         private DateTime _lastCleanupTime = DateTime.Now;
 
         public event EventHandler<TimeLineDataReceivedEventArgs>? TimeLineDataReceived;
@@ -395,52 +395,57 @@ namespace MiView.Common.Connection
         }
 
         /// <summary>
-        /// 接続状態をチェックして再接続
+        /// **自動切断時は再接続、手動切断時は再接続しない**
         /// </summary>
         private void StartReconnectTimer()
         {
+            Console.WriteLine("🔄 RECONNECT TIMER ENABLED: Automatic reconnection for network disconnections only");
+            Console.WriteLine("🚫 RULE: Manual disconnections will NOT be automatically reconnected");
+            
             _reconnectTimer = new Timer(CheckAndReconnect, null, 
                 TimeSpan.FromMinutes(RECONNECT_INTERVAL_MINUTES), 
                 TimeSpan.FromMinutes(RECONNECT_INTERVAL_MINUTES));
         }
 
         /// <summary>
-        /// **MEMORY LEAK FIX: Cleanup inactive connections and enforce size limits**
-        /// **WebSocket connections are preserved for user experience**
+        /// **CRITICAL: User WebSocket connections MUST NEVER be disconnected**
+        /// **Memory cleanup NEVER touches user-initiated WebSocket connections**
         /// </summary>
         public void CleanupInactiveConnections()
         {
             try
             {
                 var now = DateTime.Now;
-                var cutoffTime = now.AddHours(-MAX_INACTIVE_HOURS);
                 
-                // **UX IMPROVEMENT: WebSocket接続は自動切断しない（ユーザー体験重視）**
-                Console.WriteLine($"Connection cleanup check: {_persistentConnections.Count} instances (WebSocket connections preserved)");
+                // **ABSOLUTE RULE: ユーザー接続WebSocketは絶対に切断しない**
+                Console.WriteLine($"🔒 WEBSOCKET PROTECTION: {_persistentConnections.Count} user connections are ABSOLUTELY PROTECTED");
+                Console.WriteLine("🚫 RULE: User WebSocket connections MUST NEVER be disconnected by memory management");
                 
-                // サイズ制限チェック - ただしWebSocket接続は除外
+                // **メモリ制限チェック - WebSocket接続は一切触らない**
                 if (_persistentConnections.Count > MAX_PERSISTENT_CONNECTIONS)
                 {
-                    Console.WriteLine($"⚠️ Connection limit exceeded: {_persistentConnections.Count} > {MAX_PERSISTENT_CONNECTIONS}");
-                    Console.WriteLine("WebSocket connections preserved for user experience");
+                    Console.WriteLine($"⚠️ MEMORY WARNING: {_persistentConnections.Count} connections exceed limit ({MAX_PERSISTENT_CONNECTIONS})");
+                    Console.WriteLine("🔒 USER WEBSOCKETS PROTECTED: No connections will be terminated");
+                    Console.WriteLine("💡 SOLUTION: Increase memory limit or optimize other components");
                     
-                    // WebSocket接続は保持、他のリソースのみクリーンアップ
-                    // 現在はWebSocket接続のみなので、警告のみ出力
+                    // **絶対にWebSocket接続は切断しない - メモリ不足でも保護**
+                    // 他の最適化を検討（キャッシュサイズ削減など）
                 }
                 
-                // 統合タイムライン接続は軽微なクリーンアップのみ
-                if (_unifiedTimelineConnections.Count > MAX_UNIFIED_CONNECTIONS * 2) // 2倍の余裕を持たせる
+                // **統合タイムライン接続も保護**
+                if (_unifiedTimelineConnections.Count > MAX_UNIFIED_CONNECTIONS * 3) // 3倍の余裕
                 {
-                    Console.WriteLine($"Large unified connection list: {_unifiedTimelineConnections.Count} connections");
-                    // 切断はせず、ログ出力のみ
+                    Console.WriteLine($"📊 INFO: {_unifiedTimelineConnections.Count} unified connections (preserved)");
+                    Console.WriteLine("🔒 All unified timeline connections preserved");
                 }
                 
                 _lastCleanupTime = now;
-                Console.WriteLine($"Connection cleanup completed - all WebSocket connections preserved");
+                Console.WriteLine($"✅ CLEANUP COMPLETE: All user WebSocket connections remain intact and protected");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during connection cleanup: {ex.Message}");
+                Console.WriteLine($"❌ ERROR during connection cleanup: {ex.Message}");
+                Console.WriteLine("🔒 GUARANTEE: Even with errors, WebSocket connections remain protected");
             }
         }
 
@@ -473,18 +478,22 @@ namespace MiView.Common.Connection
                             
                             Console.WriteLine($"Connection check: {instanceName} - {timelineType}, Alive: {isAlive}, UserInitiated: {isUserInitiated}");
 
-                            // ユーザー操作による切断でない場合のみ再接続
+                            // **自動切断時は再接続、手動切断時は再接続しない**
                             if (!isAlive && !isUserInitiated)
                             {
                                 connectionsToReconnect.Add(timelineType);
-                                Console.WriteLine($"Connection lost, will reconnect: {instanceName} - {timelineType}");
+                                Console.WriteLine($"🔄 NETWORK DISCONNECTION: {instanceName}-{timelineType} will be automatically reconnected");
                                 
-                                // **UX IMPROVEMENT: 再接続開始の通知**
+                                // **再接続開始の通知**
                                 ConnectionStatusChanged?.Invoke(this, new ConnectionStatusChangedEventArgs 
                                 { 
                                     InstanceName = instanceName, 
                                     Status = "Reconnecting" 
                                 });
+                            }
+                            else if (!isAlive && isUserInitiated)
+                            {
+                                Console.WriteLine($"🚫 USER DISCONNECTION: {instanceName}-{timelineType} will NOT be reconnected (user intent preserved)");
                             }
                         }
 
