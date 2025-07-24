@@ -232,7 +232,7 @@ namespace MiView
             // メニューバーのイベントハンドラーを設定
             menuBarControl.ServerManagementRequested += ShowServerManagement;
             menuBarControl.ServerAddRequested += ShowAddInstanceDialog;
-            menuBarControl.ExitRequested += (sender, e) => Close();
+            menuBarControl.ExitRequested += OnExitRequested;
 #if DEBUG
             menuBarControl.GenerateDummyDataRequested += GenerateDummyData;
 #endif
@@ -2319,6 +2319,42 @@ namespace MiView
             // UIを先に閉じる
             Console.WriteLine("Application closing - UI will close first");
             
+            // **MEMORY LEAK FIX: Unsubscribe all event handlers**
+            if (_connectionManager != null)
+            {
+                _connectionManager.TimeLineDataReceived -= OnConnectionManagerTimeLineDataReceived;
+                _connectionManager.ConnectionStatusChanged -= OnConnectionStatusChanged;
+            }
+            
+            if (instanceSelectorControl != null)
+            {
+                instanceSelectorControl.ConnectButtonClicked -= cmdConnect_Click;
+                instanceSelectorControl.AddInstanceButtonClicked -= ShowAddInstanceDialog;
+                instanceSelectorControl.ServerTabSelected -= OnServerTabSelected;
+            }
+            
+            if (menuBarControl != null)
+            {
+                menuBarControl.ServerManagementRequested -= ShowServerManagement;
+                menuBarControl.ServerAddRequested -= ShowAddInstanceDialog;
+                menuBarControl.ExitRequested -= OnExitRequested;
+#if DEBUG
+                menuBarControl.GenerateDummyDataRequested -= GenerateDummyData;
+#endif
+            }
+            
+            // **MEMORY LEAK FIX: Cancel and dispose CancellationTokenSource**
+            if (_cancellationTokenSource != null)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = null;
+            }
+            
+            // **MEMORY LEAK FIX: Dispose WebSocket**
+            _webSocket?.Dispose();
+            _webSocket = null;
+            
             // キャッシュクリーンアップタイマーを停止
             _cacheCleanupTimer?.Dispose();
             
@@ -2368,6 +2404,14 @@ namespace MiView
             });
             
             base.OnClosed(e);
+        }
+
+        /// <summary>
+        /// **MEMORY LEAK FIX: Named method to replace lambda expression**
+        /// </summary>
+        private void OnExitRequested(object? sender, RoutedEventArgs e)
+        {
+            Close();
         }
 
         private async void ShowServerManagement(object? sender, RoutedEventArgs e)

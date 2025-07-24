@@ -376,6 +376,10 @@ namespace MiView.Common.Connection
                 {
                     Console.WriteLine("Socket is null or not open, skipping close");
                 }
+                
+                // **MEMORY LEAK FIX: Dispose the connection to clean up resources and event handlers**
+                connection?.Dispose();
+                Console.WriteLine("Connection disposed successfully");
             }
             catch (Exception ex)
             {

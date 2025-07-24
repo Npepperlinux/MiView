@@ -414,20 +414,43 @@ namespace MiView.Common.Connection.WebSocket
 
         public void Dispose()
         {
-            try
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
             {
-                _ConnectionClose = true;
-                
-                if (_WebSocket != null && _WebSocket.State == WebSocketState.Open)
+                try
                 {
-                    _WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Dispose", CancellationToken.None).Wait(TimeSpan.FromSeconds(5));
+                    _ConnectionClose = true;
+                    
+                    // **MEMORY LEAK FIX: Unsubscribe event handlers to prevent circular references**
+                    this.ConnectionLost -= OnConnectionLost;
+                    this.DataReceived -= OnDataReceived;
+                    
+                    if (_WebSocket != null && _WebSocket.State == WebSocketState.Open)
+                    {
+                        try
+                        {
+                            // Use ConfigureAwait(false) to avoid deadlocks
+                            _WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Dispose", CancellationToken.None)
+                                .ConfigureAwait(false).GetAwaiter().GetResult();
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error closing WebSocket: {ex.Message}");
+                        }
+                    }
+                    
+                    _WebSocket?.Dispose();
+                    _WebSocket = null;
                 }
-                
-                _WebSocket?.Dispose();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error during WebSocketManager dispose: {ex.Message}");
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error during WebSocketManager dispose: {ex.Message}");
+                }
             }
         }
     }
