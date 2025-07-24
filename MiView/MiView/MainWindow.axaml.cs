@@ -56,6 +56,11 @@ namespace MiView
         private List<WebSocketTimeLineCommon> _unifiedTimelineConnections = new();
         // インスタンスごとの持続接続（例: サーバー名→タイムライン種別→WebSocketTimeLineCommon）
         private Dictionary<string, Dictionary<string, WebSocketTimeLineCommon>> _persistentConnections = new();
+        // JobQueue用フィールド
+        private readonly Queue<(string InstanceName, string TimelineType, TimeLineContainer Container)> _timelineJobQueue = new();
+        private bool _isJobQueueRunning = false;
+        private const int JOBQUEUE_BATCH_SIZE = 10; // 一度に処理する最大件数
+        private const int JOBQUEUE_INTERVAL_MS = 50; // 処理間隔（ms）
 
         /// <summary>
         /// タイムライン表示用の列定義
@@ -1335,54 +1340,62 @@ namespace MiView
         private async void OnConnectionManagerTimeLineDataReceived(object? sender, 
             MiView.Common.Connection.TimeLineDataReceivedEventArgs e)
         {
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            lock (_timelineJobQueue)
             {
-#if DEBUG
-                Console.WriteLine($"Data received from {e.InstanceName} - {e.TimelineType}: {e.Container.DETAIL?.Substring(0, Math.Min(50, e.Container.DETAIL?.Length ?? 0))}");
-                Console.WriteLine($"Current tab index: {_selectedTabIndex}");
-#endif
-                
-                // TimeLineCreatorにデータを追加
-                _timelineCreator.AddTimeLineData(e.Container);
-                
-                // タイムライン種別ごとのキャッシュに保存
-                SaveToTimelineCacheByType(e.InstanceName, e.Container, GetTabIndexFromTimelineType(e.TimelineType));
-                
-                // UI表示の判定
-                bool shouldUpdateUI = ShouldUpdateUI(e.InstanceName, e.TimelineType);
-                Console.WriteLine($"ShouldUpdateUI check: instance={e.InstanceName}, timelineType={e.TimelineType}, selectedTab={_selectedTabIndex}, shouldUpdate={shouldUpdateUI}");
-                
-#if DEBUG
-                Console.WriteLine($"Should update UI: {shouldUpdateUI}");
-#endif
-                
-                if (shouldUpdateUI)
+                _timelineJobQueue.Enqueue((e.InstanceName, e.TimelineType, e.Container));
+            }
+            if (!_isJobQueueRunning)
+            {
+                _isJobQueueRunning = true;
+                _ = ProcessTimelineJobQueueAsync();
+            }
+        }
+
+        private async Task ProcessTimelineJobQueueAsync()
+        {
+            while (true)
+            {
+                List<(string InstanceName, string TimelineType, TimeLineContainer Container)> batch = new();
+                lock (_timelineJobQueue)
                 {
-                    // サーバー名が正しく設定されていることを確認
-                    if (string.IsNullOrEmpty(e.Container.SOURCE))
+                    while (_timelineJobQueue.Count > 0 && batch.Count < JOBQUEUE_BATCH_SIZE)
                     {
-                        e.Container.SOURCE = e.InstanceName;
+                        batch.Add(_timelineJobQueue.Dequeue());
                     }
-                    
-                    // 統合TLの場合は特別処理
-                    if (_selectedTabIndex == 0)
-                    {
-                        Console.WriteLine($"Adding unified timeline item from {e.InstanceName}: {e.Container.DETAIL?.Substring(0, Math.Min(30, e.Container.DETAIL?.Length ?? 0))}");
-                    }
-                    
-                    AddTimelineItem(e.Container, e.InstanceName);
-                    var note = new Note { Node = e.Container.ORIGINAL ?? JsonNode.Parse("{}")! };
-                    SetTimelineDetails(e.Container, note);
-                    
-#if DEBUG
-                    Console.WriteLine($"UI updated with data from {e.InstanceName} (SOURCE: {e.Container.SOURCE})");
-#endif
                 }
-                else
+                if (batch.Count == 0)
                 {
-                    Console.WriteLine($"Data cached but not displayed: {e.InstanceName} - {e.TimelineType}");
+                    _isJobQueueRunning = false;
+                    return;
                 }
-            });
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    foreach (var (instanceName, timelineType, container) in batch)
+                    {
+                        // TimeLineCreatorにデータを追加
+                        _timelineCreator.AddTimeLineData(container);
+                        // タイムライン種別ごとのキャッシュに保存
+                        SaveToTimelineCacheByType(instanceName, container, GetTabIndexFromTimelineType(timelineType));
+                        // UI表示の判定
+                        bool shouldUpdateUI = ShouldUpdateUI(instanceName, timelineType);
+                        if (shouldUpdateUI)
+                        {
+                            if (string.IsNullOrEmpty(container.SOURCE))
+                            {
+                                container.SOURCE = instanceName;
+                            }
+                            if (_selectedTabIndex == 0)
+                            {
+                                // 統合TLの場合は特別処理
+                            }
+                            AddTimelineItem(container, instanceName);
+                            var note = new Note { Node = container.ORIGINAL ?? System.Text.Json.Nodes.JsonNode.Parse("{}")! };
+                            SetTimelineDetails(container, note);
+                        }
+                    }
+                });
+                await Task.Delay(JOBQUEUE_INTERVAL_MS);
+            }
         }
 
         private void OnConnectionStatusChanged(object? sender, 
