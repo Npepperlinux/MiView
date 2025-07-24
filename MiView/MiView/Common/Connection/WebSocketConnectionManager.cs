@@ -19,7 +19,7 @@ namespace MiView.Common.Connection
         private Dictionary<string, string> _instanceTokens = new();
         private List<WebSocketTimeLineCommon> _unifiedTimelineConnections = new();
         private Timer? _reconnectTimer;
-        private const int RECONNECT_INTERVAL_MINUTES = 2; // 2分間隔に変更
+        private const int RECONNECT_INTERVAL_MINUTES = 1; // **UX IMPROVEMENT: 1分間隔に短縮（より迅速な再接続）**
         private SemaphoreSlim _connectionSemaphore = new SemaphoreSlim(10, 10); // 最大10個同時接続
         
         // **MEMORY LEAK FIX: Add size limits for collections**
@@ -406,6 +406,7 @@ namespace MiView.Common.Connection
 
         /// <summary>
         /// **MEMORY LEAK FIX: Cleanup inactive connections and enforce size limits**
+        /// **WebSocket connections are preserved for user experience**
         /// </summary>
         public void CleanupInactiveConnections()
         {
@@ -414,44 +415,28 @@ namespace MiView.Common.Connection
                 var now = DateTime.Now;
                 var cutoffTime = now.AddHours(-MAX_INACTIVE_HOURS);
                 
-                // サイズ制限チェック - インスタンス数制限
+                // **UX IMPROVEMENT: WebSocket接続は自動切断しない（ユーザー体験重視）**
+                Console.WriteLine($"Connection cleanup check: {_persistentConnections.Count} instances (WebSocket connections preserved)");
+                
+                // サイズ制限チェック - ただしWebSocket接続は除外
                 if (_persistentConnections.Count > MAX_PERSISTENT_CONNECTIONS)
                 {
-                    Console.WriteLine($"Cleaning up connections: {_persistentConnections.Count} > {MAX_PERSISTENT_CONNECTIONS}");
+                    Console.WriteLine($"⚠️ Connection limit exceeded: {_persistentConnections.Count} > {MAX_PERSISTENT_CONNECTIONS}");
+                    Console.WriteLine("WebSocket connections preserved for user experience");
                     
-                    // 最も古い接続から削除
-                    var instancesToRemove = _persistentConnections.Keys
-                        .Take(_persistentConnections.Count - MAX_PERSISTENT_CONNECTIONS)
-                        .ToList();
-                    
-                    foreach (var instance in instancesToRemove)
-                    {
-                        if (_persistentConnections.ContainsKey(instance))
-                        {
-                            foreach (var connection in _persistentConnections[instance].Values)
-                            {
-                                connection?.Dispose();
-                            }
-                            _persistentConnections.Remove(instance);
-                            _instanceTokens.Remove(instance);
-                            Console.WriteLine($"Removed inactive instance: {instance}");
-                        }
-                    }
+                    // WebSocket接続は保持、他のリソースのみクリーンアップ
+                    // 現在はWebSocket接続のみなので、警告のみ出力
                 }
                 
-                // 統合タイムライン接続数制限
-                if (_unifiedTimelineConnections.Count > MAX_UNIFIED_CONNECTIONS)
+                // 統合タイムライン接続は軽微なクリーンアップのみ
+                if (_unifiedTimelineConnections.Count > MAX_UNIFIED_CONNECTIONS * 2) // 2倍の余裕を持たせる
                 {
-                    var connectionsToRemove = _unifiedTimelineConnections.Count - MAX_UNIFIED_CONNECTIONS;
-                    for (int i = 0; i < connectionsToRemove; i++)
-                    {
-                        _unifiedTimelineConnections[i]?.Dispose();
-                        _unifiedTimelineConnections.RemoveAt(i);
-                    }
-                    Console.WriteLine($"Cleaned up {connectionsToRemove} unified timeline connections");
+                    Console.WriteLine($"Large unified connection list: {_unifiedTimelineConnections.Count} connections");
+                    // 切断はせず、ログ出力のみ
                 }
                 
                 _lastCleanupTime = now;
+                Console.WriteLine($"Connection cleanup completed - all WebSocket connections preserved");
             }
             catch (Exception ex)
             {
@@ -493,6 +478,13 @@ namespace MiView.Common.Connection
                             {
                                 connectionsToReconnect.Add(timelineType);
                                 Console.WriteLine($"Connection lost, will reconnect: {instanceName} - {timelineType}");
+                                
+                                // **UX IMPROVEMENT: 再接続開始の通知**
+                                ConnectionStatusChanged?.Invoke(this, new ConnectionStatusChangedEventArgs 
+                                { 
+                                    InstanceName = instanceName, 
+                                    Status = "Reconnecting" 
+                                });
                             }
                         }
 
