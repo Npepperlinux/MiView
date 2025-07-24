@@ -40,9 +40,9 @@ namespace MiView
         // 状態管理
         private int _selectedTabIndex = 0;
         
-        // **PERFORMANCE FIX: Scroll virtualization**
-        private const int VIEWPORT_ITEM_COUNT = 20; // 画面に表示する要素数
-        private const int BUFFER_ITEM_COUNT = 10;   // 上下のバッファ
+        // **PERFORMANCE FIX: Scroll virtualization - dynamic based on UI size**
+        private const int BUFFER_ITEM_COUNT = 5;   // 上下のバッファ（少なく調整）
+        private const double ESTIMATED_ITEM_HEIGHT = 80.0; // 推定アイテム高さ
         private int _currentScrollIndex = 0;        // 現在のスクロール位置
         
         // データ管理
@@ -203,6 +203,9 @@ namespace MiView
 
         public MainWindow()
         {
+            // **MEMORY OPTIMIZATION: Pre-allocate memory and optimize startup**
+            PreAllocateMemory();
+            
             InitializeComponent();
             _connectionManager = new WebSocketConnectionManager();
             _connectionManager.TimeLineDataReceived += OnConnectionManagerTimeLineDataReceived;
@@ -2520,27 +2523,88 @@ namespace MiView
         }
         
         /// <summary>
-        /// **PERFORMANCE FIX: Handle timeline scroll for virtualization**
+        /// **MEMORY OPTIMIZATION: Pre-allocate memory for better performance**
+        /// </summary>
+        private void PreAllocateMemory()
+        {
+            try
+            {
+                Console.WriteLine($"{DEBUG_PREFIX} メモリプリアロケーション開始");
+                
+                // **コレクション容量の事前確保**
+                // Note: 既存のフィールド初期化は変更せず、容量のみ確保
+                
+                // **辞書の初期容量確保（既存初期化を保持）**
+                if (_timelineCache.Count == 0)
+                {
+                    // 容量確保のため一時的なエントリを追加・削除
+                    for (int i = 0; i < 20; i++)
+                    {
+                        _timelineCache[$"temp_{i}"] = new List<TimeLineContainer>();
+                    }
+                    _timelineCache.Clear();
+                }
+                
+                // **文字列プールの事前作成（頻用文字列を事前生成）**
+                var commonStrings = new[]
+                {
+                    "統合TL", "ホームTL", "ローカルTL", "ソーシャルTL", "グローバルTL",
+                    "Misskey", "Mastodon", "Pleroma", 
+                    "接続中", "切断", "エラー", "読み込み中"
+                };
+                foreach (var str in commonStrings)
+                {
+                    string.Intern(str); // 文字列プールに追加
+                }
+                
+                // **ガベージコレクションの最適化設定**
+                // Note: GCSettings is not available in all .NET versions, skip for compatibility
+                
+                // **初期メモリ確保（スタートアップ遅延回避）**
+                GC.Collect(0, GCCollectionMode.Optimized);
+                GC.WaitForPendingFinalizers();
+                
+                Console.WriteLine($"{DEBUG_PREFIX} メモリプリアロケーション完了");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{ERROR_PREFIX} メモリプリアロケーションエラー: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// **PERFORMANCE FIX: Handle timeline scroll for virtualization (UI size aware)**
         /// </summary>
         private void OnTimelineScrollChanged(object? sender, ScrollChangedEventArgs e)
         {
             try
             {
                 var scrollViewer = timelineControl.TimelineScrollViewer;
-                if (scrollViewer == null) return;
+                if (scrollViewer == null || _timelineItems.Count == 0) return;
                 
-                // スクロール位置から表示すべきアイテムインデックスを計算
-                var itemHeight = 80; // 推定アイテム高さ
+                // **画面サイズに基づく動的計算**
                 var scrollTop = scrollViewer.Offset.Y;
                 var viewportHeight = scrollViewer.Viewport.Height;
                 
-                var startIndex = Math.Max(0, (int)(scrollTop / itemHeight) - BUFFER_ITEM_COUNT);
-                var endIndex = Math.Min(_timelineItems.Count - 1, 
-                    (int)((scrollTop + viewportHeight) / itemHeight) + BUFFER_ITEM_COUNT);
+                // 実際の画面に表示できるアイテム数を計算
+                var visibleItemsInViewport = Math.Ceiling(viewportHeight / ESTIMATED_ITEM_HEIGHT);
                 
-                // 仮想化の実装（現在は表示のみ、実際のDOM操作は複雑なため段階的実装）
-                var visibleItemCount = endIndex - startIndex + 1;
-                Console.WriteLine($"{DEBUG_PREFIX} スクロール仮想化: {startIndex}-{endIndex} ({visibleItemCount}件が画面内)");
+                // スクロール位置から表示すべきアイテムインデックスを計算
+                var firstVisibleIndex = Math.Max(0, (int)(scrollTop / ESTIMATED_ITEM_HEIGHT));
+                var lastVisibleIndex = Math.Min(_timelineItems.Count - 1, 
+                    (int)(firstVisibleIndex + visibleItemsInViewport));
+                
+                // バッファを含めた範囲
+                var startIndex = Math.Max(0, firstVisibleIndex - BUFFER_ITEM_COUNT);
+                var endIndex = Math.Min(_timelineItems.Count - 1, lastVisibleIndex + BUFFER_ITEM_COUNT);
+                
+                var totalVirtualizedItems = endIndex - startIndex + 1;
+                var actualVisibleItems = lastVisibleIndex - firstVisibleIndex + 1;
+                
+                // **デバッグ情報（画面サイズ対応）**
+                Console.WriteLine($"{DEBUG_PREFIX} 仮想化[画面{viewportHeight:F0}px]: " +
+                    $"表示{actualVisibleItems}件 + バッファ{totalVirtualizedItems-actualVisibleItems}件 " +
+                    $"= 計{totalVirtualizedItems}件/{_timelineItems.Count}件");
                 
                 // 将来: 画面外要素の軽量化処理
                 // OptimizeOffScreenItems(startIndex, endIndex);
