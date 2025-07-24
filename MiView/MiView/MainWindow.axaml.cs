@@ -663,7 +663,7 @@ namespace MiView
             
             // 投稿数をカウント
             _noteCount++;
-            statusBarControl.NoteCountLabel.Text = $"{_noteCount}/9999";
+            UpdateStatusBarInfo();
         }
         
 
@@ -1149,13 +1149,8 @@ namespace MiView
             // データを保存
             _timelineCacheByType[instanceName][timelineType].Insert(0, container);
             
-            // サイズ制限
-            if (_timelineCacheByType[instanceName][timelineType].Count > MAX_CACHED_ITEMS)
-            {
-                Console.WriteLine($"[DEBUG] _timelineCacheByType[{instanceName}][{timelineType}]制限: {_timelineCacheByType[instanceName][timelineType].Count}件 → {MAX_CACHED_ITEMS}件に削減");
-                _timelineCacheByType[instanceName][timelineType].RemoveAt(_timelineCacheByType[instanceName][timelineType].Count - 1);
-                Console.WriteLine($"[DEBUG] _timelineCacheByType[{instanceName}][{timelineType}]削除後: {_timelineCacheByType[instanceName][timelineType].Count}件");
-            }
+            // サーバーごとのサイズ制限（全タイムライン種別の合計）
+            ApplyServerCacheLimit(instanceName);
         }
         
         private void SaveToTimelineCacheByTypeIfNotExists(string instanceName, TimeLineContainer container, int tabIndex)
@@ -1195,13 +1190,8 @@ namespace MiView
                 // データを保存
                 _timelineCacheByType[instanceName][timelineType].Insert(0, container);
                 
-                // サイズ制限
-                if (_timelineCacheByType[instanceName][timelineType].Count > MAX_CACHED_ITEMS)
-                {
-                    Console.WriteLine($"[DEBUG] SaveIfNotExists - _timelineCacheByType[{instanceName}][{timelineType}]制限: {_timelineCacheByType[instanceName][timelineType].Count}件 → {MAX_CACHED_ITEMS}件に削減");
-                    _timelineCacheByType[instanceName][timelineType].RemoveAt(_timelineCacheByType[instanceName][timelineType].Count - 1);
-                    Console.WriteLine($"[DEBUG] SaveIfNotExists - _timelineCacheByType[{instanceName}][{timelineType}]削除後: {_timelineCacheByType[instanceName][timelineType].Count}件");
-                }
+                // サーバーごとのサイズ制限（全タイムライン種別の合計）
+                ApplyServerCacheLimit(instanceName);
                 
 #if DEBUG
                 Console.WriteLine($"Added to cache (no duplicate): {timelineType} - {instanceName}");
@@ -1986,7 +1976,7 @@ namespace MiView
                         }
                     }
                     
-                    statusBarControl.NoteCountLabel.Text = $"{_noteCount}/{MAX_CACHED_ITEMS}";
+                    UpdateStatusBarInfo();
                     
                     // 統合TLの場合は特別なメッセージを表示
                     if (tabIndex == 0)
@@ -2153,6 +2143,87 @@ namespace MiView
             }
             
             return url;
+        }
+
+        private void ApplyServerCacheLimit(string instanceName)
+        {
+            if (!_timelineCacheByType.ContainsKey(instanceName))
+                return;
+
+            // サーバー全体のキャッシュ件数を計算
+            var totalCount = _timelineCacheByType[instanceName].Values.Sum(list => list.Count);
+            
+            if (totalCount > MAX_CACHED_ITEMS)
+            {
+                Console.WriteLine($"[DEBUG] サーバー[{instanceName}]キャッシュ制限: {totalCount}件 → {MAX_CACHED_ITEMS}件に削減");
+                
+                // 古いアイテムから削除（各タイムラインから最古のものを順次削除）
+                while (_timelineCacheByType[instanceName].Values.Sum(list => list.Count) > MAX_CACHED_ITEMS)
+                {
+                    // 最も多くのアイテムを持つタイムラインから削除
+                    var maxTimeline = _timelineCacheByType[instanceName]
+                        .Where(kvp => kvp.Value.Count > 0)
+                        .OrderByDescending(kvp => kvp.Value.Count)
+                        .FirstOrDefault();
+                    
+                    if (maxTimeline.Value != null && maxTimeline.Value.Count > 0)
+                    {
+                        maxTimeline.Value.RemoveAt(maxTimeline.Value.Count - 1);
+                    }
+                    else
+                    {
+                        break; // 削除するアイテムがない場合は終了
+                    }
+                }
+                
+                var newTotal = _timelineCacheByType[instanceName].Values.Sum(list => list.Count);
+                Console.WriteLine($"[DEBUG] サーバー[{instanceName}]キャッシュ削除後: {newTotal}件");
+            }
+        }
+
+        private void UpdateStatusBarInfo()
+        {
+            // 投稿件数表示
+            statusBarControl.NoteCountLabel.Text = $"{_noteCount}/{MAX_UI_ITEMS}";
+            
+#if DEBUG
+            // 各キャッシュの詳細情報を収集
+            var cacheDetails = new List<string>();
+            
+            // UI表示件数
+            cacheDetails.Add($"UI:{_timelineItems.Count}");
+            
+            // ObservableCollection件数
+            cacheDetails.Add($"Data:{_timelineData.Count}");
+            
+            // TimelineContainer RAW件数（初期ダミー500件を除く）
+            var rawCount = Math.Max(0, timelineControl.TimelineContainer.Children.Count - MAX_UI_ITEMS);
+            cacheDetails.Add($"RAW:{rawCount}");
+            
+            // _timelineCache の詳細
+            foreach (var kvp in _timelineCache)
+            {
+                cacheDetails.Add($"{kvp.Key}:{kvp.Value.Count}");
+            }
+            
+            // _timelineCacheByType の詳細（インスタンスごとに合計）
+            foreach (var instanceKvp in _timelineCacheByType)
+            {
+                var instanceTotal = instanceKvp.Value.Values.Sum(list => list.Count);
+                var shortInstance = instanceKvp.Key.Length > 12 ? instanceKvp.Key.Substring(0, 12) + "..." : instanceKvp.Key;
+                cacheDetails.Add($"{shortInstance}:{instanceTotal}");
+            }
+            
+            statusBarControl.MemoryInfoLabel.Text = $"キャッシュ: {string.Join(",", cacheDetails)}";
+            
+            // メモリ使用量を表示
+            var memoryMB = GC.GetTotalMemory(false) / (1024 * 1024);
+            statusBarControl.MemoryUsageLabel.Text = $"メモリ: {memoryMB}MB";
+#else
+            // リリースビルドでは基本情報のみ
+            statusBarControl.MemoryInfoLabel.Text = $"キャッシュ: {_timelineItems.Count + _timelineData.Count}件";
+            statusBarControl.MemoryUsageLabel.Text = "";
+#endif
         }
 
         protected override void OnClosed(EventArgs e)
