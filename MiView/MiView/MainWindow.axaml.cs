@@ -32,10 +32,11 @@ namespace MiView
         private Dictionary<string, string> _instanceTokens = new();
         // 定数
         private const string SETTINGS_FILE = "settings.json";
-        private const int MAX_CACHED_ITEMS = 5000;
+        private const int MAX_CACHED_ITEMS = 1000; // 内部キャッシュ
         private const string DEFAULT_INSTANCE = "misskey.io";
         private const string DEFAULT_SOFTWARE = "Misskey";
-        
+
+        private const int MAX_UI_ITEMS = 500;      // UI表示
         // 状態管理
         private int _selectedTabIndex = 0;
         private int _noteCount = 0;
@@ -184,6 +185,25 @@ namespace MiView
             _connectionManager.TimeLineDataReceived += OnConnectionManagerTimeLineDataReceived;
             _connectionManager.ConnectionStatusChanged += OnConnectionStatusChanged;
             InitializeUI();
+            for (int i = 0; i < MAX_UI_ITEMS; i++)
+            {
+                var emptyItem = new TimeLineContainer
+                {
+                    IDENTIFIED = $"empty_{i}",
+                    USERNAME = string.Empty,
+                    USERID = string.Empty,
+                    DETAIL = string.Empty,
+                    UPDATEDAT = string.Empty,
+                    SOURCE = string.Empty,
+                    SOFTWARE = string.Empty,
+                    RENOTED = false,
+                    ISLOCAL = false,
+                    PROTECTED = TimeLineContainer.PROTECTED_STATUS.Public,
+                    ORIGINAL = null
+                };
+                _timelineData.Add(emptyItem);
+                AddTimelineItem(emptyItem);
+            }
         }
 
         private void InitializeUI()
@@ -1037,15 +1057,21 @@ namespace MiView
                         timelineControl.TimelineContainer.Children.Remove(loadingMessage);
                     }
                     
-                    // ObservableCollectionに追加
+                    // ObservableCollectionにも追加
                     _timelineData.Insert(0, container);
-                    
-                    // UIスレッドでの表示サイズ制限
-                    if (_timelineData.Count > MAX_CACHED_ITEMS)
+                    // UI表示件数制限
+                    if (_timelineData.Count > MAX_UI_ITEMS)
                     {
                         _timelineData.RemoveAt(_timelineData.Count - 1);
                     }
-                    
+
+                    // タイムラインの先頭に追加
+                    AddTimelineItem(container, instanceName);
+                    // UI表示件数制限
+                    if (timelineControl.TimelineContainer.Children.Count > MAX_UI_ITEMS)
+                    {
+                        timelineControl.TimelineContainer.Children.RemoveAt(timelineControl.TimelineContainer.Children.Count - 1);
+                    }
                     // SOURCEが空の場合は現在のインスタンス名を設定
                     if (string.IsNullOrEmpty(container.SOURCE))
                     {
