@@ -21,6 +21,12 @@ namespace MiView.Common.Connection
         private Timer? _reconnectTimer;
         private const int RECONNECT_INTERVAL_MINUTES = 2; // 2分間隔に変更
         private SemaphoreSlim _connectionSemaphore = new SemaphoreSlim(10, 10); // 最大10個同時接続
+        
+        // **MEMORY LEAK FIX: Add size limits for collections**
+        private const int MAX_PERSISTENT_CONNECTIONS = 50; // 最大50インスタンス
+        private const int MAX_UNIFIED_CONNECTIONS = 20; // 統合TL接続最大20
+        private const int MAX_INACTIVE_HOURS = 2; // 2時間非アクティブで削除
+        private DateTime _lastCleanupTime = DateTime.Now;
 
         public event EventHandler<TimeLineDataReceivedEventArgs>? TimeLineDataReceived;
         public event EventHandler<ConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
@@ -398,8 +404,69 @@ namespace MiView.Common.Connection
                 TimeSpan.FromMinutes(RECONNECT_INTERVAL_MINUTES));
         }
 
+        /// <summary>
+        /// **MEMORY LEAK FIX: Cleanup inactive connections and enforce size limits**
+        /// </summary>
+        public void CleanupInactiveConnections()
+        {
+            try
+            {
+                var now = DateTime.Now;
+                var cutoffTime = now.AddHours(-MAX_INACTIVE_HOURS);
+                
+                // サイズ制限チェック - インスタンス数制限
+                if (_persistentConnections.Count > MAX_PERSISTENT_CONNECTIONS)
+                {
+                    Console.WriteLine($"Cleaning up connections: {_persistentConnections.Count} > {MAX_PERSISTENT_CONNECTIONS}");
+                    
+                    // 最も古い接続から削除
+                    var instancesToRemove = _persistentConnections.Keys
+                        .Take(_persistentConnections.Count - MAX_PERSISTENT_CONNECTIONS)
+                        .ToList();
+                    
+                    foreach (var instance in instancesToRemove)
+                    {
+                        if (_persistentConnections.ContainsKey(instance))
+                        {
+                            foreach (var connection in _persistentConnections[instance].Values)
+                            {
+                                connection?.Dispose();
+                            }
+                            _persistentConnections.Remove(instance);
+                            _instanceTokens.Remove(instance);
+                            Console.WriteLine($"Removed inactive instance: {instance}");
+                        }
+                    }
+                }
+                
+                // 統合タイムライン接続数制限
+                if (_unifiedTimelineConnections.Count > MAX_UNIFIED_CONNECTIONS)
+                {
+                    var connectionsToRemove = _unifiedTimelineConnections.Count - MAX_UNIFIED_CONNECTIONS;
+                    for (int i = 0; i < connectionsToRemove; i++)
+                    {
+                        _unifiedTimelineConnections[i]?.Dispose();
+                        _unifiedTimelineConnections.RemoveAt(i);
+                    }
+                    Console.WriteLine($"Cleaned up {connectionsToRemove} unified timeline connections");
+                }
+                
+                _lastCleanupTime = now;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error during connection cleanup: {ex.Message}");
+            }
+        }
+
         private void CheckAndReconnect(object? state)
         {
+            // **MEMORY LEAK FIX: Run cleanup before reconnection check**
+            if ((DateTime.Now - _lastCleanupTime).TotalMinutes > 30) // 30分に1回クリーンアップ
+            {
+                CleanupInactiveConnections();
+            }
+            
             Task.Run(async () =>
             {
                 Console.WriteLine("=== Starting connection health check ===");

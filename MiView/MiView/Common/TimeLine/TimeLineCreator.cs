@@ -144,6 +144,10 @@ namespace MiView.Common.TimeLine
         };
 
         public List<TimeLineContainer> TimeLineData = new List<TimeLineContainer>();
+        
+        // **MEMORY LEAK FIX: Add size limits for timeline data**
+        private const int MAX_TIMELINE_DATA_ITEMS = 1000; // 最大1000件に制限
+        private const int CLEANUP_BATCH_SIZE = 100; // 制限超過時に削除する件数
 
         // Windows Forms依存のコードをコメントアウト
         // private MainForm? _MainForm { get; set; }
@@ -193,6 +197,15 @@ namespace MiView.Common.TimeLine
         public void AddTimeLineData(TimeLineContainer container)
         {
             TimeLineData.Add(container);
+            
+            // **MEMORY LEAK FIX: Enforce size limits for timeline data**
+            if (TimeLineData.Count > MAX_TIMELINE_DATA_ITEMS)
+            {
+                // 古いデータから削除（FIFO）
+                var itemsToRemove = TimeLineData.Count - MAX_TIMELINE_DATA_ITEMS + CLEANUP_BATCH_SIZE;
+                TimeLineData.RemoveRange(0, itemsToRemove);
+                Console.WriteLine($"TimeLineCreator: Cleaned up {itemsToRemove} old timeline items. Current count: {TimeLineData.Count}");
+            }
         }
 
         /// <summary>

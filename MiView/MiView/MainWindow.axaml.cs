@@ -64,7 +64,7 @@ namespace MiView
         
         // キャッシュクリーンアップ用
         private Timer? _cacheCleanupTimer;
-        private const int CACHE_CLEANUP_INTERVAL_MINUTES = 5; // 5分間隔でチェック
+        private const int CACHE_CLEANUP_INTERVAL_MINUTES = 3; // 3分間隔でチェック（より頻繁に）
         private const int CACHE_CLEANUP_AGE_MINUTES = 30; // 30分以上前のデータを削除
         private const int CACHE_CLEANUP_MIN_ITEMS = 50; // 50件を上回っている場合のみ実行
         
@@ -2228,6 +2228,59 @@ namespace MiView
                     }
                 }
                 
+                // _timelineData のクリーンアップ（最重要）
+                if (_timelineData.Count > CACHE_CLEANUP_MIN_ITEMS)
+                {
+                    var beforeCount = _timelineData.Count;
+                    var removedCount = 0;
+                    
+                    for (int i = _timelineData.Count - 1; i >= 0; i--)
+                    {
+                        if (DateTime.TryParse(_timelineData[i].UPDATEDAT, out var updateTime))
+                        {
+                            if (updateTime < cutoffTime)
+                            {
+                                _timelineData.RemoveAt(i);
+                                removedCount++;
+                            }
+                        }
+                    }
+                    
+                    if (removedCount > 0)
+                    {
+                        Console.WriteLine($"{DEBUG_PREFIX} クリーンアップ[_timelineData]: {beforeCount}件 → {_timelineData.Count}件 ({removedCount}件削除)");
+                        
+                        // UIからも古いアイテムを削除
+                        Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            while (_timelineItems.Count > _timelineData.Count)
+                            {
+                                if (_timelineItems.Count > 0)
+                                {
+                                    timelineControl.TimelineContainer.Children.RemoveAt(timelineControl.TimelineContainer.Children.Count - 1);
+                                    _timelineItems.RemoveAt(_timelineItems.Count - 1);
+                                }
+                            }
+                        });
+                    }
+                }
+                
+                // **MEMORY LEAK FIX: Cleanup other components**
+                try
+                {
+                    // WebSocketConnectionManagerのクリーンアップ
+                    _connectionManager?.CleanupInactiveConnections();
+                    
+                    // ガベージコレクションを実行してメモリを解放
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                }
+                catch (Exception cleanupEx)
+                {
+                    Console.WriteLine($"{ERROR_PREFIX} 追加クリーンアップエラー: {cleanupEx.Message}");
+                }
+                
                 Console.WriteLine($"{DEBUG_PREFIX} キャッシュクリーンアップ完了");
             }
             catch (Exception ex)
@@ -2378,7 +2431,7 @@ namespace MiView
                         await _connectionManager?.DisconnectAll(true);
                     });
                     
-                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10)); // 10秒タイムアウト
+                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30)); // 30秒タイムアウトに延長
                     var completedTask = await Task.WhenAny(cleanupTask, timeoutTask);
                     
                     if (completedTask == timeoutTask)

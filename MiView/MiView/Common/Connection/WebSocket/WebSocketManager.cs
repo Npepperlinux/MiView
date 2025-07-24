@@ -90,6 +90,9 @@ namespace MiView.Common.Connection.WebSocket
             get; set;
         }
         = new object[0];
+        
+        // **MEMORY LEAK FIX: Add size limit for timeline objects**
+        private const int MAX_TIMELINE_OBJECTS = 100;
 
         /// <summary>
         /// Set TimeLineControl
@@ -101,7 +104,17 @@ namespace MiView.Common.Connection.WebSocket
             {
                 this._TimeLineObject = new object[0];
             }
+            
+            // **MEMORY LEAK FIX: Enforce size limit for timeline objects**
             this._TimeLineObject = this._TimeLineObject.Concat(new object[] { timeLine }).ToArray();
+            
+            if (this._TimeLineObject.Length > MAX_TIMELINE_OBJECTS)
+            {
+                // 古いオブジェクトから削除（FIFO）
+                var newSize = MAX_TIMELINE_OBJECTS - 10; // 10個のバッファを残す
+                this._TimeLineObject = this._TimeLineObject.Skip(this._TimeLineObject.Length - newSize).ToArray();
+                System.Diagnostics.Debug.WriteLine($"WebSocketManager: Cleaned up timeline objects. Current count: {this._TimeLineObject.Length}");
+            }
         }
 
         /// <summary>
@@ -434,8 +447,9 @@ namespace MiView.Common.Connection.WebSocket
                     {
                         try
                         {
-                            // Use ConfigureAwait(false) to avoid deadlocks
-                            _WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Dispose", CancellationToken.None)
+                            // **MEMORY LEAK FIX: Add timeout for WebSocket close operation**
+                            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15)); // 15秒タイムアウト
+                            _WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Dispose", cts.Token)
                                 .ConfigureAwait(false).GetAwaiter().GetResult();
                         }
                         catch (Exception ex)
