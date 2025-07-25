@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace MiView.Common.Connection.WebSocket
 {
-    internal class WebSocketManager : IDisposable
+    public class WebSocketManager : IDisposable
     {
         /// <summary>
         /// Host
