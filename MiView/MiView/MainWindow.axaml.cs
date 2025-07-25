@@ -57,8 +57,7 @@ namespace MiView
         private WebSocketConnectionManager _connectionManager;
         // private bool _isConnected = false; // 未使用のためコメントアウト
         private HashSet<string> _connectedInstances = new();
-        // 統合TL用のWebSocketTimeLineCommonインスタンスリスト
-        private List<WebSocketTimeLineCommon> _unifiedTimelineConnections = new();
+        // 統合TL用の接続管理（WebSocketConnectionManagerに統一）
         // インスタンスごとの持続接続（例: サーバー名→タイムライン種別→WebSocketTimeLineCommon）
         private Dictionary<string, Dictionary<string, WebSocketTimeLineCommon>> _persistentConnections = new();
         // JobQueue用フィールド
@@ -1056,6 +1055,9 @@ namespace MiView
                 // ソーシャルTLデータの場合は統合TL用にも保存（統合TLで表示するため）
                 if (effectiveTabIndex == 0) // 統合TL接続中のソーシャルTLデータ
                 {
+#if DEBUG
+                    Console.WriteLine($"🔄 UNIFIED TL DATA: Received from {instanceName} - {container.DETAIL?.Substring(0, Math.Min(30, container.DETAIL?.Length ?? 0))}...");
+#endif
                     // ソーシャルTLタブ（インデックス2）用にも保存（重複チェック付き）
                     SaveToTimelineCacheByTypeIfNotExists(instanceName, container, 2);
                 }
@@ -1702,27 +1704,10 @@ namespace MiView
 
         private async Task DisconnectWebSocket(bool isUserInitiated = true)
         {
-            // 統合TLの接続を切断
-            foreach (var connection in _unifiedTimelineConnections)
-            {
-                try
-                {
-                    // ユーザー操作による切断かどうかを設定
-                    connection.SetUserInitiatedDisconnect(isUserInitiated);
-                    
-                    connection.TimeLineDataReceived -= OnTimeLineDataReceived;
-                    var socket = connection.GetSocketClient();
-                    if (socket != null && socket.State == WebSocketState.Open)
-                    {
-                        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnect", CancellationToken.None);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error disconnecting unified timeline: {ex.Message}");
-                }
-            }
-            _unifiedTimelineConnections.Clear();
+            // 統合TLの接続を切断（WebSocketConnectionManagerに統一管理）
+#if DEBUG
+            Console.WriteLine($"🔄 UNIFIED TL DISCONNECT: Using ConnectionManager for unified timeline disconnect");
+#endif
             
             if (_webSocketTimeLine != null)
             {
@@ -2208,9 +2193,18 @@ namespace MiView
                 Console.WriteLine($"{DEBUG_PREFIX} キャッシュクリーンアップ開始");
                 var cutoffTime = DateTime.Now.AddMinutes(-CACHE_CLEANUP_AGE_MINUTES);
                 
-                // _timelineCache のクリーンアップ
+                // _timelineCache のクリーンアップ（統合TLデータは保護）
                 foreach (var cacheKey in _timelineCache.Keys)
                 {
+                    // **統合TL絶対保護: 統合TLキャッシュは絶対にクリーンアップしない**
+                    if (cacheKey.StartsWith("unified_tl"))
+                    {
+#if DEBUG
+                        Console.WriteLine($"🛡️ UNIFIED TL PROTECTION: Skipping cleanup for unified TL cache: {cacheKey}");
+#endif
+                        continue; // 統合TLキャッシュのクリーンアップをスキップ
+                    }
+                    
                     var cache = _timelineCache[cacheKey];
                     if (cache.Count > CACHE_CLEANUP_MIN_ITEMS)
                     {
@@ -2236,11 +2230,20 @@ namespace MiView
                     }
                 }
                 
-                // _timelineCacheByType のクリーンアップ
+                // _timelineCacheByType のクリーンアップ（統合TL用データは保護）
                 foreach (var instanceName in _timelineCacheByType.Keys)
                 {
                     foreach (var timelineType in _timelineCacheByType[instanceName].Keys)
                     {
+                        // **統合TL絶対保護: ソーシャルTLデータは絶対にクリーンアップしない**
+                        if (timelineType == "ソーシャルTL")
+                        {
+#if DEBUG
+                            Console.WriteLine($"🛡️ UNIFIED TL PROTECTION: Skipping cleanup for {instanceName} - {timelineType} cache");
+#endif
+                            continue; // ソーシャルTLデータのクリーンアップをスキップ
+                        }
+                        
                         var cache = _timelineCacheByType[instanceName][timelineType];
                         if (cache.Count > CACHE_CLEANUP_MIN_ITEMS)
                         {
@@ -2318,10 +2321,31 @@ namespace MiView
                         {
                             Console.WriteLine($"{DEBUG_PREFIX} WebSocket保護のためJobQueue早期クリーンアップ: {_timelineJobQueue.Count}/{MAX_JOBQUEUE_SIZE}");
                             
-                            // WebSocket保護のため、JobQueueを積極的に削減
-                            while (_timelineJobQueue.Count > MAX_JOBQUEUE_SIZE / 2)
+                            // WebSocket保護のため、JobQueueを積極的に削減（統合TLジョブは保護）
+                            var tempQueue = new Queue<(string InstanceName, string TimelineType, TimeLineContainer Container)>();
+                            
+                            // **統合TL絶対保護: ソーシャルTLジョブを優先保持**
+                            while (_timelineJobQueue.Count > 0)
                             {
-                                _timelineJobQueue.Dequeue(); // 古いジョブを削除
+                                var job = _timelineJobQueue.Dequeue();
+                                
+                                // ソーシャルTLジョブまたは新しいジョブは保持
+                                if (job.TimelineType == "ソーシャルTL" || tempQueue.Count < MAX_JOBQUEUE_SIZE / 2)
+                                {
+                                    tempQueue.Enqueue(job);
+                                }
+                                else
+                                {
+#if DEBUG
+                                    Console.WriteLine($"🛡️ UNIFIED TL PROTECTION: Keeping ソーシャルTL job from {job.InstanceName}");
+#endif
+                                }
+                            }
+                            
+                            // JobQueueを再構築
+                            while (tempQueue.Count > 0)
+                            {
+                                _timelineJobQueue.Enqueue(tempQueue.Dequeue());
                             }
                             Console.WriteLine($"{DEBUG_PREFIX} JobQueue削減完了: {_timelineJobQueue.Count}件に削減");
                         }

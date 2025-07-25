@@ -22,6 +22,9 @@ namespace MiView.Common.Connection
         private const int RECONNECT_INTERVAL_MINUTES = 1; // **UX IMPROVEMENT: 1分間隔に短縮（より迅速な再接続）**
         private SemaphoreSlim _connectionSemaphore = new SemaphoreSlim(10, 10); // 最大10個同時接続
         
+        // **統合TL絶対保護: 統合TL用接続は絶対に自動切断しない**
+        private readonly HashSet<WebSocketTimeLineCommon> _unifiedTLProtectedConnections = new();
+        
 
         public event EventHandler<TimeLineDataReceivedEventArgs>? TimeLineDataReceived;
         public event EventHandler<ConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
@@ -163,7 +166,9 @@ namespace MiView.Common.Connection
                     
                     connection.TimeLineDataReceived += (sender, container) =>
                     {
+#if DEBUG
                         Console.WriteLine($"🔄 DATA RECEIVED: {instanceName} - {timelineType} - Content: {container.DETAIL?.Substring(0, Math.Min(50, container.DETAIL?.Length ?? 0))}...");
+#endif
                         OnTimeLineDataReceived(instanceName, timelineType, container);
                     };
 
@@ -188,12 +193,26 @@ namespace MiView.Common.Connection
                                     connection.OpenTimeLine(instanceName, apiKey);
                                     Console.WriteLine($"Timeline opened successfully for {instanceName} - {timelineType}");
                                     
+#if DEBUG
                                     Console.WriteLine($"🚀 STARTING continuous reading for {instanceName} - {timelineType}");
+#endif
                                     WebSocketTimeLineCommon.ReadTimeLineContinuous(connection);
+#if DEBUG
                                     Console.WriteLine($"✅ Continuous reading LAUNCHED for {instanceName} - {timelineType}");
+#endif
 
                                     _persistentConnections[instanceName][timelineType] = connection;
                                     Console.WriteLine($"Persistent connection established: {instanceName} - {timelineType}");
+                                    
+                                    // **統合TL保護: ソーシャルTL接続は統合TL用として絶対保護**
+                                    if (timelineType == "ソーシャルTL")
+                                    {
+                                        _unifiedTLProtectedConnections.Add(connection);
+#if DEBUG
+                                        Console.WriteLine($"🛡️ UNIFIED TL PROTECTION: {instanceName} - {timelineType} is now ABSOLUTELY PROTECTED");
+#endif
+                                    }
+                                    
                                     return true;
                                 }
                                 catch (Exception ex)
@@ -254,21 +273,49 @@ namespace MiView.Common.Connection
         }
 
         /// <summary>
-        /// 統合TL用の接続を取得
+        /// 統合TL用の接続を取得（アクティブな接続のみ）
         /// </summary>
         public List<object> GetUnifiedTimelineConnections()
         {
             _unifiedTimelineConnections.Clear();
+#if DEBUG
+            Console.WriteLine($"🔄 UNIFIED TL: Building connections list from {_persistentConnections.Count} instances");
+#endif
 
             foreach (var instance in _persistentConnections.Keys)
             {
                 if (_persistentConnections[instance].ContainsKey("ソーシャルTL"))
                 {
                     var socialConnection = _persistentConnections[instance]["ソーシャルTL"];
-                    _unifiedTimelineConnections.Add(socialConnection);
+                    var socket = socialConnection.GetSocketClient();
+                    var state = socket?.State.ToString() ?? "Unknown";
+                    
+                    // **重要修正: アクティブな接続のみを統合TLに追加**
+                    if (socket?.State == WebSocketState.Open && !socialConnection.IsUserInitiatedDisconnect())
+                    {
+#if DEBUG
+                        Console.WriteLine($"📡 UNIFIED TL: Adding ACTIVE {instance} - ソーシャルTL (State: {state})");
+#endif
+                        _unifiedTimelineConnections.Add(socialConnection);
+                    }
+                    else
+                    {
+#if DEBUG
+                        Console.WriteLine($"⚠️ UNIFIED TL: Skipping INACTIVE {instance} - ソーシャルTL (State: {state}, UserDisconnect: {socialConnection.IsUserInitiatedDisconnect()})");
+#endif
+                    }
+                }
+                else
+                {
+#if DEBUG
+                    Console.WriteLine($"⚠️ UNIFIED TL: {instance} missing ソーシャルTL connection");
+#endif
                 }
             }
 
+#if DEBUG
+            Console.WriteLine($"✅ UNIFIED TL: Total ACTIVE connections: {_unifiedTimelineConnections.Count}");
+#endif
             return _unifiedTimelineConnections.Cast<object>().ToList();
         }
 
@@ -290,6 +337,7 @@ namespace MiView.Common.Connection
         /// </summary>
         public void DebugConnectionStatus()
         {
+#if DEBUG
             Console.WriteLine("=== 📊 CONNECTION STATUS DEBUG ===");
             Console.WriteLine($"🏢 Total instances: {_persistentConnections.Count}");
             
@@ -310,6 +358,7 @@ namespace MiView.Common.Connection
                 }
             }
             Console.WriteLine("=== 📊 END CONNECTION STATUS DEBUG ===");
+#endif
         }
 
         /// <summary>
@@ -328,7 +377,23 @@ namespace MiView.Common.Connection
                 {
                     Console.WriteLine($"Disconnecting connection: {connection}");
                     await DisconnectConnection(connection, isUserInitiated);
-                    _unifiedTimelineConnections.Remove(connection);
+                    // **修正: 統合TLリストからも確実に削除（ユーザー操作時のみ）**
+                    if (_unifiedTimelineConnections.Contains(connection))
+                    {
+                        _unifiedTimelineConnections.Remove(connection);
+#if DEBUG
+                        Console.WriteLine($"🔄 UNIFIED TL: Removed disconnected connection from unified list");
+#endif
+                    }
+                    
+                    // **統合TL保護解除: ユーザー操作による切断時のみ保護を解除**
+                    if (isUserInitiated && _unifiedTLProtectedConnections.Contains(connection))
+                    {
+                        _unifiedTLProtectedConnections.Remove(connection);
+#if DEBUG
+                        Console.WriteLine($"🛡️ UNIFIED TL PROTECTION: Removed protection (user initiated disconnect)");
+#endif
+                    }
                 }
                 _persistentConnections.Remove(instanceName);
                 Console.WriteLine($"Removed instance {instanceName} from persistent connections");
@@ -362,6 +427,16 @@ namespace MiView.Common.Connection
             {
                 Console.WriteLine($"DisconnectConnection called, isUserInitiated: {isUserInitiated}");
                 
+                // **統合TL絶対保護: ユーザー操作以外では統合TL用接続を絶対に切断しない**
+                if (_unifiedTLProtectedConnections.Contains(connection) && !isUserInitiated)
+                {
+#if DEBUG
+                    Console.WriteLine($"🛡️ UNIFIED TL PROTECTION: Blocking automatic disconnection of protected connection");
+#endif
+                    Console.WriteLine("UNIFIED TL CONNECTION PROTECTED: Automatic disconnection blocked");
+                    return; // 自動切断をブロック
+                }
+                
                 // ユーザー操作による切断かどうかを設定
                 connection.SetUserInitiatedDisconnect(isUserInitiated);
                 Console.WriteLine("Set user initiated disconnect flag");
@@ -378,6 +453,15 @@ namespace MiView.Common.Connection
                 else
                 {
                     Console.WriteLine("Socket is null or not open, skipping close");
+                }
+                
+                // **統合TL保護解除: ユーザー操作による切断時のみ保護を解除**
+                if (isUserInitiated && _unifiedTLProtectedConnections.Contains(connection))
+                {
+                    _unifiedTLProtectedConnections.Remove(connection);
+#if DEBUG
+                    Console.WriteLine($"🛡️ UNIFIED TL PROTECTION: Removed protection (user initiated disconnect)");
+#endif
                 }
                 
                 // **MEMORY LEAK FIX: Dispose the connection to clean up resources and event handlers**
@@ -410,7 +494,9 @@ namespace MiView.Common.Connection
             
             Task.Run(async () =>
             {
+#if DEBUG
                 Console.WriteLine("=== 🔍 Starting connection health check ===");
+#endif
                 
                 // まず現在の接続状態を詳細表示
                 DebugConnectionStatus();
@@ -436,7 +522,16 @@ namespace MiView.Common.Connection
                             if (!isAlive && !isUserInitiated)
                             {
                                 connectionsToReconnect.Add(timelineType);
-                                Console.WriteLine($"🔄 NETWORK DISCONNECTION: {instanceName}-{timelineType} will be automatically reconnected");
+                                
+                                // **統合TL優先再接続: ソーシャルTLは最優先で再接続**
+                                if (timelineType == "ソーシャルTL")
+                                {
+                                    Console.WriteLine($"🛡️ UNIFIED TL PRIORITY: {instanceName}-{timelineType} will be reconnected with HIGHEST PRIORITY");
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"🔄 NETWORK DISCONNECTION: {instanceName}-{timelineType} will be automatically reconnected");
+                                }
                                 
                                 // **再接続開始の通知**
                                 ConnectionStatusChanged?.Invoke(this, new ConnectionStatusChangedEventArgs 
@@ -451,18 +546,58 @@ namespace MiView.Common.Connection
                             }
                         }
 
-                        // 再接続を実行
-                        foreach (var timelineType in connectionsToReconnect)
+                        // **統合TL優先再接続: ソーシャルTLを最初に再接続**
+                        var sortedConnections = connectionsToReconnect
+                            .OrderBy(t => t == "ソーシャルTL" ? 0 : 1) // ソーシャルTLを最優先
+                            .ToList();
+                        
+                        foreach (var timelineType in sortedConnections)
                         {
                             try
                             {
-                                Console.WriteLine($"Attempting reconnection: {instanceName} - {timelineType}");
+                                if (timelineType == "ソーシャルTL")
+                                {
+                                    Console.WriteLine($"🛡️ UNIFIED TL PRIORITY RECONNECT: {instanceName} - {timelineType}");
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"Attempting reconnection: {instanceName} - {timelineType}");
+                                }
+                                
                                 await ReconnectTimeline(instanceName, timelineType);
-                                Console.WriteLine($"Reconnection successful: {instanceName} - {timelineType}");
+                                
+                                if (timelineType == "ソーシャルTL")
+                                {
+                                    Console.WriteLine($"🛡️ UNIFIED TL PRIORITY RECONNECT SUCCESS: {instanceName} - {timelineType}");
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"Reconnection successful: {instanceName} - {timelineType}");
+                                }
                             }
                             catch (Exception ex)
                             {
                                 Console.WriteLine($"Reconnection failed: {instanceName} - {timelineType}: {ex.Message}");
+                                
+                                // **統合TL重要接続: ソーシャルTL再接続失敗時は追加リトライ**
+                                if (timelineType == "ソーシャルTL")
+                                {
+                                    Console.WriteLine($"🛡️ UNIFIED TL CRITICAL: Scheduling additional retry for {instanceName} - {timelineType}");
+                                    // 5秒後に追加リトライをスケジュール
+                                    _ = Task.Delay(5000).ContinueWith(async _ =>
+                                    {
+                                        try
+                                        {
+                                            Console.WriteLine($"🛡️ UNIFIED TL RETRY: Additional reconnection attempt for {instanceName} - {timelineType}");
+                                            await ReconnectTimeline(instanceName, timelineType);
+                                            Console.WriteLine($"🛡️ UNIFIED TL RETRY SUCCESS: {instanceName} - {timelineType}");
+                                        }
+                                        catch (Exception retryEx)
+                                        {
+                                            Console.WriteLine($"🛡️ UNIFIED TL RETRY FAILED: {instanceName} - {timelineType}: {retryEx.Message}");
+                                        }
+                                    });
+                                }
                             }
                         }
                     }
@@ -507,7 +642,22 @@ namespace MiView.Common.Connection
             };
 
             var apiKey = _instanceTokens.ContainsKey(instanceName) ? _instanceTokens[instanceName] : null;
-            await ConnectTimelineType(instanceName, timelineType, kind, apiKey);
+            
+            // **統合TL優先再接続: ソーシャルTLは即座に保護リストに追加**
+            var success = await ConnectTimelineType(instanceName, timelineType, kind, apiKey);
+            
+            if (success && timelineType == "ソーシャルTL")
+            {
+                // 再接続成功時に保護リストに追加（ConnectTimelineTypeで追加済みだが念のため確認）
+                var connection = GetConnection(instanceName, timelineType) as WebSocketTimeLineCommon;
+                if (connection != null && !_unifiedTLProtectedConnections.Contains(connection))
+                {
+                    _unifiedTLProtectedConnections.Add(connection);
+#if DEBUG
+                    Console.WriteLine($"🛡️ UNIFIED TL PROTECTION: Re-added protection after reconnection for {instanceName} - {timelineType}");
+#endif
+                }
+            }
         }
 
         private void OnTimeLineDataReceived(string instanceName, string timelineType, TimeLineContainer container)
