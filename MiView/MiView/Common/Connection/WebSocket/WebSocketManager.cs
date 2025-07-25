@@ -77,6 +77,26 @@ namespace MiView.Common.Connection.WebSocket
         }
         = false;
 
+        /// <summary>
+        /// KeepAliveタイマー (接続維持用)
+        /// </summary>
+        private Timer? _PingTimer;
+        
+        /// <summary>
+        /// 最後のデータ受信時刻
+        /// </summary>
+        private DateTime _LastPongReceived = DateTime.Now;
+        
+        /// <summary>
+        /// KeepAlive送信間隔（秒）
+        /// </summary>
+        private const int PING_INTERVAL_SECONDS = 15;
+        
+        /// <summary>
+        /// データ受信タイムアウト（秒）- 5分
+        /// </summary>
+        private const int PONG_TIMEOUT_SECONDS = 300;
+
         protected object? _MainForm
         {
             get; set;
@@ -337,6 +357,12 @@ namespace MiView.Common.Connection.WebSocket
                 System.Diagnostics.Debug.WriteLine($"WebSocket connection successful to: {this._HostUrl}");
                 this._WebSocket = WS;
                 this._State = WS.State;
+                
+                // **アイドルタイムアウト対策: KeepAliveタイマーを開始**
+                StartPingTimer();
+#if DEBUG
+                Console.WriteLine($"🏓 KEEPALIVE TIMER STARTED: {this._HostDefinition} - Interval: {PING_INTERVAL_SECONDS}s");
+#endif
             }
             catch (OperationCanceledException)
             {
@@ -411,8 +437,91 @@ namespace MiView.Common.Connection.WebSocket
         }
         protected void CallDataReceived(string ResponseMessage)
         {
+            // **アイドルタイムアウト対策: データ受信時刻を更新**
+            _LastPongReceived = DateTime.Now;
+            
             DataReceived(this, new ConnectDataReceivedEventArgs() { MessageRaw = ResponseMessage });
         }
+
+        /// <summary>
+        /// **アイドルタイムアウト対策: KeepAliveタイマーを開始**
+        /// </summary>
+        private void StartPingTimer()
+        {
+            StopPingTimer(); // 既存のタイマーがあれば停止
+            
+            _LastPongReceived = DateTime.Now;
+            _PingTimer = new Timer(SendPingFrame, null, 
+                TimeSpan.FromSeconds(PING_INTERVAL_SECONDS), 
+                TimeSpan.FromSeconds(PING_INTERVAL_SECONDS));
+                
+#if DEBUG
+            Console.WriteLine($"🏓 KEEPALIVE TIMER: Started for {_HostDefinition}");
+#endif
+        }
+
+        /// <summary>
+        /// **アイドルタイムアウト対策: KeepAliveタイマーを停止**
+        /// </summary>
+        private void StopPingTimer()
+        {
+            if (_PingTimer != null)
+            {
+#if DEBUG
+                Console.WriteLine($"🏓 KEEPALIVE TIMER: Stopped for {_HostDefinition}");
+#endif
+                _PingTimer.Dispose();
+                _PingTimer = null;
+            }
+        }
+
+        /// <summary>
+        /// **アイドルタイムアウト対策: ダミーデータを送信して接続維持**
+        /// </summary>
+        private async void SendPingFrame(object? state)
+        {
+            try
+            {
+                if (_WebSocket?.State != WebSocketState.Open)
+                {
+#if DEBUG
+                    Console.WriteLine($"🏓 KEEPALIVE SKIPPED: Connection not open for {_HostDefinition} (State: {_WebSocket?.State})");
+#endif
+                    return;
+                }
+
+                // 最後のデータ受信からの経過時間をチェック
+                var timeSinceLastData = DateTime.Now - _LastPongReceived;
+                if (timeSinceLastData.TotalSeconds > PONG_TIMEOUT_SECONDS)
+                {
+#if DEBUG
+                    Console.WriteLine($"🏓 DATA TIMEOUT: {_HostDefinition} - {timeSinceLastData.TotalSeconds}s since last data");
+#endif
+                    // タイムアウトした場合は接続切断を報告
+                    CallConnectionLost();
+                    return;
+                }
+
+                // Misskeyサーバー用のダミーデータ（小さなJSONメッセージ）を送信
+                var keepAliveMessage = "{\"type\":\"ping\"}";
+                var messageBuffer = Encoding.UTF8.GetBytes(keepAliveMessage);
+                await _WebSocket.SendAsync(new ArraySegment<byte>(messageBuffer), 
+                    WebSocketMessageType.Text, true, CancellationToken.None);
+
+#if DEBUG
+                Console.WriteLine($"🏓 KEEPALIVE SENT: {_HostDefinition} - Message: {keepAliveMessage}");
+#endif
+            }
+            catch (Exception ex)
+            {
+#if DEBUG
+                Console.WriteLine($"🏓 KEEPALIVE ERROR: {_HostDefinition} - {ex.Message}");
+#endif
+                // KeepAlive送信エラーの場合も接続切断を報告
+                CallConnectionLost();
+            }
+        }
+
 
         public void Dispose()
         {
@@ -427,6 +536,9 @@ namespace MiView.Common.Connection.WebSocket
                 try
                 {
                     _ConnectionClose = true;
+                    
+                    // **アイドルタイムアウト対策: KeepAliveタイマーを停止**
+                    StopPingTimer();
                     
                     this.ConnectionLost -= OnConnectionLost;
                     this.DataReceived -= OnDataReceived;
