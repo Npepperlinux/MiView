@@ -22,11 +22,6 @@ namespace MiView.Common.Connection
         private const int RECONNECT_INTERVAL_MINUTES = 1; // **UX IMPROVEMENT: 1分間隔に短縮（より迅速な再接続）**
         private SemaphoreSlim _connectionSemaphore = new SemaphoreSlim(10, 10); // 最大10個同時接続
         
-        // **WEBSOCKET ABSOLUTE PROTECTION: Generous limits to never force disconnection**
-        private const int MAX_PERSISTENT_CONNECTIONS = 200; // **増加: WebSocket保護のため制限を大幅緩和**
-        private const int MAX_UNIFIED_CONNECTIONS = 100; // **増加: 統合TL接続制限を大幅緩和**
-        private const int MAX_INACTIVE_HOURS = int.MaxValue; // **無制限: 非アクティブでも絶対切断しない**
-        private DateTime _lastCleanupTime = DateTime.Now;
 
         public event EventHandler<TimeLineDataReceivedEventArgs>? TimeLineDataReceived;
         public event EventHandler<ConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
@@ -182,8 +177,8 @@ namespace MiView.Common.Connection
                         {
                             Console.WriteLine($"Attempting connection {retry}/{maxRetries} for {instanceName} - {timelineType}");
                             
-                            // 接続タイムアウトを30秒に設定
-                            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
+                            // 接続タイムアウトを10分に設定
+                            var timeoutTask = Task.Delay(TimeSpan.FromMinutes(10));
                             
                             var connectionTask = Task.Run(() =>
                             {
@@ -407,55 +402,9 @@ namespace MiView.Common.Connection
                 TimeSpan.FromMinutes(RECONNECT_INTERVAL_MINUTES));
         }
 
-        /// <summary>
-        /// **CRITICAL: User WebSocket connections MUST NEVER be disconnected**
-        /// **Memory cleanup NEVER touches user-initiated WebSocket connections**
-        /// </summary>
-        public void CleanupInactiveConnections()
-        {
-            try
-            {
-                var now = DateTime.Now;
-                
-                // **ABSOLUTE RULE: ユーザー接続WebSocketは絶対に切断しない**
-                Console.WriteLine($"🔒 WEBSOCKET PROTECTION: {_persistentConnections.Count} user connections are ABSOLUTELY PROTECTED");
-                Console.WriteLine("🚫 RULE: User WebSocket connections MUST NEVER be disconnected by memory management");
-                
-                // **メモリ制限チェック - WebSocket接続は一切触らない**
-                if (_persistentConnections.Count > MAX_PERSISTENT_CONNECTIONS)
-                {
-                    Console.WriteLine($"⚠️ MEMORY WARNING: {_persistentConnections.Count} connections exceed limit ({MAX_PERSISTENT_CONNECTIONS})");
-                    Console.WriteLine("🔒 USER WEBSOCKETS PROTECTED: No connections will be terminated");
-                    Console.WriteLine("💡 SOLUTION: Increase memory limit or optimize other components");
-                    
-                    // **絶対にWebSocket接続は切断しない - メモリ不足でも保護**
-                    // 他の最適化を検討（キャッシュサイズ削減など）
-                }
-                
-                // **統合タイムライン接続も保護**
-                if (_unifiedTimelineConnections.Count > MAX_UNIFIED_CONNECTIONS * 3) // 3倍の余裕
-                {
-                    Console.WriteLine($"📊 INFO: {_unifiedTimelineConnections.Count} unified connections (preserved)");
-                    Console.WriteLine("🔒 All unified timeline connections preserved");
-                }
-                
-                _lastCleanupTime = now;
-                Console.WriteLine($"✅ CLEANUP COMPLETE: All user WebSocket connections remain intact and protected");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ ERROR during connection cleanup: {ex.Message}");
-                Console.WriteLine("🔒 GUARANTEE: Even with errors, WebSocket connections remain protected");
-            }
-        }
 
         private void CheckAndReconnect(object? state)
         {
-            // **MEMORY LEAK FIX: Run cleanup before reconnection check**
-            if ((DateTime.Now - _lastCleanupTime).TotalMinutes > 30) // 30分に1回クリーンアップ
-            {
-                CleanupInactiveConnections();
-            }
             
             Task.Run(async () =>
             {

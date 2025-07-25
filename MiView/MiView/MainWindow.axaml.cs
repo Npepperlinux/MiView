@@ -2308,7 +2308,6 @@ namespace MiView
                 try
                 {
                     // **PRIORITY 1: WebSocket接続の状況確認（切断は絶対にしない）**
-                    _connectionManager?.CleanupInactiveConnections(); // 保護的クリーンアップのみ
                     
                     // **PRIORITY 2: WebSocket保護のため他のメモリ使用量を積極的に削減**
                     
@@ -2509,7 +2508,7 @@ namespace MiView
                         await _connectionManager?.DisconnectAll(true);
                     });
                     
-                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30)); // 30秒タイムアウトに延長
+                    var timeoutTask = Task.Delay(TimeSpan.FromMinutes(10)); // 10分タイムアウト
                     var completedTask = await Task.WhenAny(cleanupTask, timeoutTask);
                     
                     if (completedTask == timeoutTask)

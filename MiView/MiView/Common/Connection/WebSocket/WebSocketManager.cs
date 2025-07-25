@@ -91,8 +91,6 @@ namespace MiView.Common.Connection.WebSocket
         }
         = new object[0];
         
-        // **MEMORY LEAK FIX: Add size limit for timeline objects**
-        private const int MAX_TIMELINE_OBJECTS = 100;
 
         /// <summary>
         /// Set TimeLineControl
@@ -105,16 +103,7 @@ namespace MiView.Common.Connection.WebSocket
                 this._TimeLineObject = new object[0];
             }
             
-            // **MEMORY LEAK FIX: Enforce size limit for timeline objects**
             this._TimeLineObject = this._TimeLineObject.Concat(new object[] { timeLine }).ToArray();
-            
-            if (this._TimeLineObject.Length > MAX_TIMELINE_OBJECTS)
-            {
-                // 古いオブジェクトから削除（FIFO）
-                var newSize = MAX_TIMELINE_OBJECTS - 10; // 10個のバッファを残す
-                this._TimeLineObject = this._TimeLineObject.Skip(this._TimeLineObject.Length - newSize).ToArray();
-                System.Diagnostics.Debug.WriteLine($"WebSocketManager: Cleaned up timeline objects. Current count: {this._TimeLineObject.Length}");
-            }
         }
 
         /// <summary>
@@ -330,8 +319,8 @@ namespace MiView.Common.Connection.WebSocket
                 WS.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
                 WS.Options.SetRequestHeader("User-Agent", "MiView/1.0");
                 
-                // 接続タイムアウトを90秒に延長
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+                // 接続タイムアウトを10分に延長
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
                 
                 System.Diagnostics.Debug.WriteLine($"Attempting WebSocket connection to: {this._HostUrl}");
                 await WS.ConnectAsync(new Uri(this._HostUrl), cts.Token);
@@ -439,7 +428,6 @@ namespace MiView.Common.Connection.WebSocket
                 {
                     _ConnectionClose = true;
                     
-                    // **MEMORY LEAK FIX: Unsubscribe event handlers to prevent circular references**
                     this.ConnectionLost -= OnConnectionLost;
                     this.DataReceived -= OnDataReceived;
                     
@@ -447,8 +435,7 @@ namespace MiView.Common.Connection.WebSocket
                     {
                         try
                         {
-                            // **MEMORY LEAK FIX: Add timeout for WebSocket close operation**
-                            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15)); // 15秒タイムアウト
+                            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10)); // 10分タイムアウト
                             _WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Dispose", cts.Token)
                                 .ConfigureAwait(false).GetAwaiter().GetResult();
                         }
