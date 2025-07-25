@@ -287,6 +287,10 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
                         {
                             // 接続スタンバイ
                         }
+                        if (loopCount % 50 == 1) // 50回に1回、受信待機状態をログ出力
+                        {
+                            Console.WriteLine($"⏳ WAITING FOR DATA: {WSTimeLine._HostDefinition} (Task: {taskId})");
+                        }
                         var Response = await WSTimeLine.GetSocketClient().ReceiveAsync(new ArraySegment<byte>(ResponseBuffer), CancellationToken.None);
                         if (Response.MessageType == WebSocketMessageType.Close)
                         {
@@ -304,15 +308,16 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
                     }
                     catch (Exception ce)
                     {
+                        Console.WriteLine($"❌ RECEIVE FAILED: {WSTimeLine._HostDefinition} - {ce.Message} (Task: {taskId})");
                         System.Diagnostics.Debug.WriteLine("receive failed");
                         System.Diagnostics.Debug.WriteLine(WSTimeLine._HostUrl);
                         System.Diagnostics.Debug.WriteLine(ce);
 
                         if (WSTimeLine.GetSocketClient().State != WebSocketState.Open)
                         {
-                            Thread.Sleep(1000);
-
-                            WebSocketTimeLineCommon.ReadTimeLineContinuous(WSTimeLine);
+                            Console.WriteLine($"🔄 CONNECTION LOST: {WSTimeLine._HostDefinition} - Exiting reader task (Task: {taskId})");
+                            WSTimeLine.CallConnectionLost();
+                            return; // 再帰呼び出しを防ぐため、タスクを終了
                         }
 
                         WSTimeLine.CallConnectionLost();
