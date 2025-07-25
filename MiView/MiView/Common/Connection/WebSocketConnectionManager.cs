@@ -163,7 +163,7 @@ namespace MiView.Common.Connection
                     
                     connection.TimeLineDataReceived += (sender, container) =>
                     {
-                        Console.WriteLine($"Timeline data received from {instanceName} - {timelineType}");
+                        Console.WriteLine($"🔄 DATA RECEIVED: {instanceName} - {timelineType} - Content: {container.DETAIL?.Substring(0, Math.Min(50, container.DETAIL?.Length ?? 0))}...");
                         OnTimeLineDataReceived(instanceName, timelineType, container);
                     };
 
@@ -188,9 +188,9 @@ namespace MiView.Common.Connection
                                     connection.OpenTimeLine(instanceName, apiKey);
                                     Console.WriteLine($"Timeline opened successfully for {instanceName} - {timelineType}");
                                     
-                                    Console.WriteLine($"Starting continuous reading for {instanceName} - {timelineType}");
+                                    Console.WriteLine($"🚀 STARTING continuous reading for {instanceName} - {timelineType}");
                                     WebSocketTimeLineCommon.ReadTimeLineContinuous(connection);
-                                    Console.WriteLine($"Continuous reading started for {instanceName} - {timelineType}");
+                                    Console.WriteLine($"✅ Continuous reading LAUNCHED for {instanceName} - {timelineType}");
 
                                     _persistentConnections[instanceName][timelineType] = connection;
                                     Console.WriteLine($"Persistent connection established: {instanceName} - {timelineType}");
@@ -290,24 +290,26 @@ namespace MiView.Common.Connection
         /// </summary>
         public void DebugConnectionStatus()
         {
-            Console.WriteLine("=== Connection Status Debug ===");
-            Console.WriteLine($"Total instances: {_persistentConnections.Count}");
+            Console.WriteLine("=== 📊 CONNECTION STATUS DEBUG ===");
+            Console.WriteLine($"🏢 Total instances: {_persistentConnections.Count}");
             
             foreach (var instance in _persistentConnections.Keys)
             {
-                Console.WriteLine($"Instance: {instance}");
+                Console.WriteLine($"🖥️  Instance: {instance}");
                 var connections = _persistentConnections[instance];
-                Console.WriteLine($"  Timeline connections: {connections.Count}");
+                Console.WriteLine($"    📡 Timeline connections: {connections.Count}");
                 
                 foreach (var timelineType in connections.Keys)
                 {
                     var connection = connections[timelineType];
                     var socket = connection.GetSocketClient();
                     var state = socket?.State.ToString() ?? "Unknown";
-                    Console.WriteLine($"    {timelineType}: {state}");
+                    var isUserDisconnect = connection.IsUserInitiatedDisconnect();
+                    var statusIcon = state == "Open" ? "✅" : (state == "Closed" ? "❌" : "⚠️");
+                    Console.WriteLine($"      {statusIcon} {timelineType}: {state} (UserDisconnect: {isUserDisconnect})");
                 }
             }
-            Console.WriteLine("=== End Connection Status Debug ===");
+            Console.WriteLine("=== 📊 END CONNECTION STATUS DEBUG ===");
         }
 
         /// <summary>
@@ -408,7 +410,10 @@ namespace MiView.Common.Connection
             
             Task.Run(async () =>
             {
-                Console.WriteLine("=== Starting connection health check ===");
+                Console.WriteLine("=== 🔍 Starting connection health check ===");
+                
+                // まず現在の接続状態を詳細表示
+                DebugConnectionStatus();
                 
                 foreach (var instanceName in _persistentConnections.Keys.ToList())
                 {

@@ -250,14 +250,26 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
         {
             // バッファは多めに取っておく(どうせあとでカットする)
             var ResponseBuffer = new byte[4096 * 4];
+            var threadId = Thread.CurrentThread.ManagedThreadId;
+            Console.WriteLine($"📡 READER THREAD STARTED: {WSTimeLine._HostDefinition} (Thread: {threadId})");
+            
             _ = Task.Run(async () =>
             {
+                var taskId = Task.CurrentId;
+                Console.WriteLine($"🎯 ASYNC READER TASK: {WSTimeLine._HostDefinition} (Task: {taskId}, Thread: {Thread.CurrentThread.ManagedThreadId})");
+                
                 //if (WSTimeLine.GetSocketState() != WebSocketState.Open)
                 //{
                 //    WSTimeLine.OnConnectionLost(WSTimeLine, new EventArgs());
                 //}
+                var loopCount = 0;
                 while (WSTimeLine.GetSocketState() == WebSocketState.Open)
                 {
+                    loopCount++;
+                    if (loopCount % 10 == 1) // 10回に1回ログを出力
+                    {
+                        Console.WriteLine($"🔄 READING LOOP: {WSTimeLine._HostDefinition} - Loop #{loopCount} (Task: {taskId})");
+                    }
                     // 受信本体
                     try
                     {
@@ -284,6 +296,7 @@ namespace MiView.Common.Connection.WebSocket.Misskey.v2025
                         else
                         {
                             var ResponseMessage = Encoding.UTF8.GetString(ResponseBuffer, 0, Response.Count);
+                            Console.WriteLine($"💬 MSG RECEIVED: {WSTimeLine._HostDefinition} - Length: {Response.Count} (Task: {taskId})");
                             DbgOutputSocketReceived(ResponseMessage);
 
                             WSTimeLine.CallDataReceived(ResponseMessage);
