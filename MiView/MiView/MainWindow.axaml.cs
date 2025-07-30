@@ -37,7 +37,7 @@ namespace MiView
 
         private const int MAX_UI_ITEMS = 500;      // UI表示
         // 設定ファイル
-        private string SETTINGS_DIR = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        private string? SETTINGS_DIR = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         private string APP_SETTINGS_DIR = Path.Combine(SETTINGS_DIR, "MiView");
         private string SETTINGS_FILE = Path.Combine(APP_SETTINGS_DIR, "settings.json");
         // 状態管理
