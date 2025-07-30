@@ -208,10 +208,6 @@ namespace MiView
             // **MEMORY OPTIMIZATION: Pre-allocate memory and optimize startup**
             PreAllocateMemory();
 
-            // 設定ファイルパスを初期化
-            APP_SETTINGS_DIR = Path.Combine(SETTINGS_DIR, "MiView");
-            SETTINGS_FILE = Path.Combine(APP_SETTINGS_DIR, "settings.json");
-
             InitializeComponent();
             _connectionManager = new WebSocketConnectionManager();
             _connectionManager.TimeLineDataReceived += OnConnectionManagerTimeLineDataReceived;
@@ -2063,6 +2059,9 @@ namespace MiView
         {
             try
             {
+                // 設定ファイルパスを初期化
+                APP_SETTINGS_DIR = Path.Combine(SETTINGS_DIR, "MiView");
+                SETTINGS_FILE = Path.Combine(APP_SETTINGS_DIR, "settings.json");
                 if (File.Exists(SETTINGS_FILE))
                 {
                     var json = File.ReadAllText(SETTINGS_FILE);
@@ -2124,6 +2123,9 @@ namespace MiView
         {
             try
             {
+                // 設定ファイルパスを初期化
+                APP_SETTINGS_DIR = Path.Combine(SETTINGS_DIR, "MiView");
+                SETTINGS_FILE = Path.Combine(APP_SETTINGS_DIR, "settings.json");
                 var settings = new AppSettings
                 {
                     Instances = _instances.ToList(),
