@@ -37,8 +37,25 @@ namespace MiView
 
         private const int MAX_UI_ITEMS = 500;      // UI表示
         // 設定ファイル
-        private static readonly string SETTINGS_DIR = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MiView");
+        private static readonly string SETTINGS_DIR = GetSettingsDirectory();
         private static readonly string SETTINGS_FILE = Path.Combine(SETTINGS_DIR, "settings.json");
+
+        private static string GetSettingsDirectory()
+        {
+            string? appData = null;
+            try
+            {
+                appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            }
+            catch { }
+            if (!string.IsNullOrEmpty(appData) && Directory.Exists(appData))
+            {
+                return Path.Combine(appData, "MiView");
+            }
+            // アプリデータディレクトリが取得できなかった場合（主にLinux）: ホームディレクトリ/.config/MiView
+            string? home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return Path.Combine(home, ".config", "MiView");
+        }
         // 状態管理
         private int _selectedTabIndex = 0;
         
